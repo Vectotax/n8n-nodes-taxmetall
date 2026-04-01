@@ -693,7 +693,6 @@ export class TaxMetall implements INodeType {
 				let responseData;
 
 				const headers = {
-					'tax-api-key': credentials.apiKey as string,
 					'ngrok-skip-browser-warning': 'true',
 					'Content-Type': 'application/json',
 				};
@@ -712,7 +711,7 @@ export class TaxMetall implements INodeType {
 					} else if (operation === 'getByDrawingNumber') {
 						qs.zeichnungsnr = this.getNodeParameter('drawingNumber', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-articles`,
 						qs,
@@ -730,7 +729,7 @@ export class TaxMetall implements INodeType {
 						qs.von = this.getNodeParameter('auftragVon', i) as string;
 						qs.bis = this.getNodeParameter('auftragBis', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-orders`,
 						qs,
@@ -752,7 +751,7 @@ export class TaxMetall implements INodeType {
 						qs.von = this.getNodeParameter('erVon', i) as string;
 						qs.bis = this.getNodeParameter('erBis', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-purchase-invoices`,
 						qs,
@@ -771,7 +770,7 @@ export class TaxMetall implements INodeType {
 					} else if (operation === 'getByOrderId') {
 						qs.auftragnr = this.getNodeParameter('orderId', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-customers`,
 						qs,
@@ -790,7 +789,7 @@ export class TaxMetall implements INodeType {
 					} else if (operation === 'getByArticle') {
 						qs.artikelnr = this.getNodeParameter('lieferantArtikelNr', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-suppliers`,
 						qs,
@@ -810,7 +809,7 @@ export class TaxMetall implements INodeType {
 						qs.von = this.getNodeParameter('lieferscheinVon', i) as string;
 						qs.bis = this.getNodeParameter('lieferscheinBis', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-delivery-notes`,
 						qs,
@@ -840,7 +839,7 @@ export class TaxMetall implements INodeType {
 						if (filter.bezahlt === true) qs.bezahlt = 'true';
 						if (filter.mahnsperre === true) qs.mahnsperre = 'true';
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-dunning`,
 						qs,
@@ -860,7 +859,7 @@ export class TaxMetall implements INodeType {
 						qs.von = this.getNodeParameter('rechnungVon', i) as string;
 						qs.bis = this.getNodeParameter('rechnungBis', i) as string;
 					}
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/get-invoices`,
 						qs,
@@ -883,7 +882,7 @@ export class TaxMetall implements INodeType {
 						} else if (offerArtNr) {
 							offerBody.artikelnr = offerArtNr;
 						}
-						responseData = await this.helpers.httpRequest({
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'POST',
 							url: `${baseUrl}/api/create-offer`,
 							body: offerBody,
@@ -901,7 +900,7 @@ export class TaxMetall implements INodeType {
 							qs.von = this.getNodeParameter('offerVon', i) as string;
 							qs.bis = this.getNodeParameter('offerBis', i) as string;
 						}
-						responseData = await this.helpers.httpRequest({
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'GET',
 							url: `${baseUrl}/api/get-offers`,
 							qs,
@@ -934,7 +933,7 @@ export class TaxMetall implements INodeType {
 					if (additionalFields.perspectiveLeadId)
 						akquiseBody.perspectiveLeadId = additionalFields.perspectiveLeadId;
 
-					responseData = await this.helpers.httpRequest({
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'POST',
 						url: `${baseUrl}/api/akquise-create`,
 						body: akquiseBody,

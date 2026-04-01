@@ -238,11 +238,10 @@ export class TaxMetallStatistics implements INodeType {
 
 				let response: StatisticsListResponse;
 				try {
-					response = await this.helpers.httpRequest({
+					response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/statistics/list`,
 						headers: {
-							'tax-api-key': credentials.apiKey as string,
 							'ngrok-skip-browser-warning': 'true',
 						},
 						json: true,
@@ -279,7 +278,6 @@ export class TaxMetallStatistics implements INodeType {
 		const baseUrl = credentials.baseUrl as string;
 
 		const headers = {
-			'tax-api-key': credentials.apiKey as string,
 			'ngrok-skip-browser-warning': 'true',
 			'Content-Type': 'application/json',
 		};
@@ -316,7 +314,7 @@ export class TaxMetallStatistics implements INodeType {
 					parameters[key] = value;
 				}
 
-				const responseData = await this.helpers.httpRequest({
+				const responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 					method: 'POST',
 					url: `${baseUrl}/api/statistics/execute`,
 					body: { statisticId, parameters },

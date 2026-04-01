@@ -1,4 +1,5 @@
 import {
+	IAuthenticateGeneric,
 	ICredentialTestRequest,
 	ICredentialType,
 	INodeProperties,
@@ -9,6 +10,16 @@ export class TaxMetallApi implements ICredentialType {
 	displayName = 'TaxMetall API';
 	documentationUrl = 'https://www.vectotax.de';
 	icon = 'file:VectotaxLogo.svg' as const;
+
+	authenticate: IAuthenticateGeneric = {
+		type: 'generic',
+		properties: {
+			headers: {
+				'tax-api-key': '={{$credentials.apiKey}}',
+			},
+		},
+	};
+
 	test: ICredentialTestRequest = {
 		request: {
 			baseURL: '={{$credentials.baseUrl}}',
