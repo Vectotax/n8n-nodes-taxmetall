@@ -1,0 +1,11 @@
+name: Scan npm package
+
+on:
+  workflow_dispatch:  # Manuell auslösbar über GitHub Actions UI
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Scan published package
+        run: npx @n8n/scan-community-package @vectotaxsoftwaregmbh/n8n-nodes-taxmetall
