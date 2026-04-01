@@ -28,15 +28,15 @@ export class TaxMetallApi implements ICredentialType {
 			typeOptions: { password: true },
 			default: '',
 			required: true,
-			description: 'Dein API-Key für den Header: tax-api-key',
+			description: 'Your API key for the header: tax-api-key',
 		},
 		{
-			displayName: 'Basis URL',
+			displayName: 'Base URL',
 			name: 'baseUrl',
 			type: 'string',
 			default: 'https://my-domain:8443',
 			required: true,
-			description: 'Die Basis-URL deiner TaxMetall Instanz',
+			description: 'The base URL of your TaxMetall instance',
 		},
 	];
 }

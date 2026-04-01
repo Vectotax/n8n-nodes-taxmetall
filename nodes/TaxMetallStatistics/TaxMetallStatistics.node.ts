@@ -24,15 +24,15 @@ interface StatisticsListResponse {
 
 export class TaxMetallStatistics implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'TaxMetall: Statistik ausführen',
+		displayName: 'TaxMetall: Execute Statistics',
 		name: 'taxMetallStatistics',
 		icon: 'file:VectotaxLogo.svg',
 		group: ['transform'],
 		version: 1,
 		description:
-			'Führt eine Statistik- oder Auswertungsabfrage im TaxMetall ERP-System aus und gibt die Ergebnisse als JSON zurück.',
-		subtitle: 'Statistik laden',
-		defaults: { name: 'TaxMetall: Statistik' },
+			'Executes a statistics or report query in the TaxMetall ERP system and returns the results as JSON.',
+		subtitle: 'Load statistics',
+		defaults: { name: 'TaxMetall: Statistics' },
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
 		credentials: [
@@ -42,9 +42,9 @@ export class TaxMetallStatistics implements INodeType {
 			},
 		],
 		properties: [
-			// ─── Statistik-Auswahl ───────────────────────────────────────────────────
+			// ─── Statistics selection ────────────────────────────────────────────────
 			{
-				displayName: 'Statistik / Auswertung Name or ID',
+				displayName: 'Statistics / Report Name or ID',
 				name: 'statisticId',
 				type: 'options',
 				typeOptions: {
@@ -53,175 +53,175 @@ export class TaxMetallStatistics implements INodeType {
 				default: '',
 				required: true,
 				noDataExpression: true,
-				description: 'Wähle die auszuführende Auswertung. In der Beschreibung der Option steht, welche Parameter sie benötigt. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+				description: 'Select the report to execute. The option description indicates which parameters it requires. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
 			},
 
-			// ─── Hauptzeitraum ───────────────────────────────────────────────────────
+			// ─── Main date range ─────────────────────────────────────────────────────
 			{
-				displayName: 'Datum Von',
+				displayName: 'Date From',
 				name: 'datumVon',
 				type: 'dateTime',
 				default: '',
-				description: 'Startdatum des Auswertungszeitraums (SQL-Parameter: DatumVon / %Av)',
+				description: 'Start date of the reporting period (SQL parameter: DatumVon / %Av)',
 			},
 			{
-				displayName: 'Datum Bis',
+				displayName: 'Date To',
 				name: 'datumBis',
 				type: 'dateTime',
 				default: '',
-				description: 'Enddatum des Auswertungszeitraums (SQL-Parameter: DatumBis / %Ab)',
+				description: 'End date of the reporting period (SQL parameter: DatumBis / %Ab)',
 			},
 
-			// ─── Vergleichszeitraum ──────────────────────────────────────────────────
+			// ─── Comparison period ───────────────────────────────────────────────────
 			{
-				displayName: 'Vergleich Von',
+				displayName: 'Comparison From',
 				name: 'vergleichVon',
 				type: 'dateTime',
 				default: '',
-				description: 'Startdatum eines Vergleichszeitraums (SQL-Parameter: VergleichVon / %Vgv)',
+				description: 'Start date of a comparison period (SQL parameter: VergleichVon / %Vgv)',
 			},
 			{
-				displayName: 'Vergleich Bis',
+				displayName: 'Comparison To',
 				name: 'vergleichBis',
 				type: 'dateTime',
 				default: '',
-				description: 'Enddatum eines Vergleichszeitraums (SQL-Parameter: VergleichBis / %Vgb)',
+				description: 'End date of a comparison period (SQL parameter: VergleichBis / %Vgb)',
 			},
 
-			// ─── Weitere optionale Parameter ─────────────────────────────────────────
+			// ─── Additional optional parameters ──────────────────────────────────────
 			{
-				displayName: 'Weitere Parameter',
+				displayName: 'Additional Parameters',
 				name: 'weitereParameter',
 				type: 'collection',
-				placeholder: 'Parameter hinzufügen',
+				placeholder: 'Add parameter',
 				default: {},
-				description: 'Optionale Filterparameter — welche die gewählte Statistik benötigt, steht in deren Beschreibung oben',
+				description: 'Optional filter parameters — which ones the selected report requires is shown in its description above',
 				options: [
 					{
-						displayName: 'Angebot-Nr',
-						name: 'Angebot',
-						type: 'string',
-						default: '',
-						description: 'Angebotsnummer (SQL-Parameter: Angebot / %An)',
-					},
-					{
-						displayName: 'Angebotsposition',
-						name: 'AngebotsPos',
-						type: 'string',
-						default: '',
-						description: 'Angebotsposition (SQL-Parameter: AngebotsPos / %PAn)',
-					},
-					{
-						displayName: 'Artikel-Nr',
-						name: 'Artikel',
-						type: 'string',
-						default: '',
-						description: 'Artikelnummer (SQL-Parameter: Artikel / %Ar)',
-					},
-					{
-						displayName: 'Artikelgruppe',
+						displayName: 'Article Group',
 						name: 'ArtikelGruppe',
 						type: 'string',
 						default: '',
-						description: 'Artikelgruppe (SQL-Parameter: ArtikelGruppe / %Ag)',
+						description: 'Article group (SQL parameter: ArtikelGruppe / %Ag)',
 					},
 					{
-						displayName: 'Auftrags-Nr',
-						name: 'Auftrag',
+						displayName: 'Article No.',
+						name: 'Artikel',
 						type: 'string',
 						default: '',
-						description: 'Auftragsnummer (SQL-Parameter: Auftrag / %Au)',
+						description: 'Article number (SQL parameter: Artikel / %Ar)',
 					},
 					{
-						displayName: 'Auftragsart',
-						name: 'AuftragsArt',
-						type: 'string',
-						default: '',
-						description: 'Auftragsart-Kürzel (SQL-Parameter: AuftragsArt / %Aa)',
-					},
-					{
-						displayName: 'Auftragsposition',
-						name: 'AuftragsPos',
-						type: 'string',
-						default: '',
-						description: 'Auftragsposition (SQL-Parameter: AuftragsPos / %PAu)',
-					},
-					{
-						displayName: 'Bestell-Nr',
-						name: 'Bestellung',
-						type: 'string',
-						default: '',
-						description: 'Bestellnummer (SQL-Parameter: Bestellung / %Be)',
-					},
-					{
-						displayName: 'Bestellposition',
-						name: 'BestellPos',
-						type: 'string',
-						default: '',
-						description: 'Bestellposition (SQL-Parameter: BestellPos / %PBe)',
-					},
-					{
-						displayName: 'Geschäftsbereich',
+						displayName: 'Business Area',
 						name: 'GeschBereich',
 						type: 'string',
 						default: '',
-						description: 'Geschäftsbereich (SQL-Parameter: GeschBereich / %Gb)',
+						description: 'Business area (SQL parameter: GeschBereich / %Gb)',
 					},
 					{
-						displayName: 'Kunden-Nr',
+						displayName: 'Customer No.',
 						name: 'Kunden',
 						type: 'string',
 						default: '',
-						description: 'Kundennummer (SQL-Parameter: Kunden / %K)',
+						description: 'Customer number (SQL parameter: Kunden / %K)',
 					},
 					{
-						displayName: 'Lagerort',
-						name: 'Lagerort',
-						type: 'string',
-						default: '',
-						description: 'Lagerort-Kürzel (SQL-Parameter: Lagerort / %Lo)',
-					},
-					{
-						displayName: 'Lieferanten-Nr',
-						name: 'Lieferanten',
-						type: 'string',
-						default: '',
-						description: 'Lieferantennummer (SQL-Parameter: Lieferanten / %L)',
-					},
-					{
-						displayName: 'Mitarbeiter',
+						displayName: 'Employee',
 						name: 'Mitarbeiter',
 						type: 'string',
 						default: '',
-						description: 'Mitarbeiterkürzel (SQL-Parameter: Mitarbeiter / %Mn)',
+						description: 'Employee abbreviation (SQL parameter: Mitarbeiter / %Mn)',
 					},
 					{
-						displayName: 'Projekt-Nr',
+						displayName: 'Offer No.',
+						name: 'Angebot',
+						type: 'string',
+						default: '',
+						description: 'Offer number (SQL parameter: Angebot / %An)',
+					},
+					{
+						displayName: 'Offer Position',
+						name: 'AngebotsPos',
+						type: 'string',
+						default: '',
+						description: 'Offer position (SQL parameter: AngebotsPos / %PAn)',
+					},
+					{
+						displayName: 'Order No.',
+						name: 'Auftrag',
+						type: 'string',
+						default: '',
+						description: 'Order number (SQL parameter: Auftrag / %Au)',
+					},
+					{
+						displayName: 'Order Position',
+						name: 'AuftragsPos',
+						type: 'string',
+						default: '',
+						description: 'Order position (SQL parameter: AuftragsPos / %PAu)',
+					},
+					{
+						displayName: 'Order Type',
+						name: 'AuftragsArt',
+						type: 'string',
+						default: '',
+						description: 'Order type abbreviation (SQL parameter: AuftragsArt / %Aa)',
+					},
+					{
+						displayName: 'Project No.',
 						name: 'Projekt',
 						type: 'string',
 						default: '',
-						description: 'Projektnummer (SQL-Parameter: Projekt / %Pn)',
+						description: 'Project number (SQL parameter: Projekt / %Pn)',
+					},
+					{
+						displayName: 'Purchase Order No.',
+						name: 'Bestellung',
+						type: 'string',
+						default: '',
+						description: 'Purchase order number (SQL parameter: Bestellung / %Be)',
+					},
+					{
+						displayName: 'Purchase Order Position',
+						name: 'BestellPos',
+						type: 'string',
+						default: '',
+						description: 'Purchase order position (SQL parameter: BestellPos / %PBe)',
+					},
+					{
+						displayName: 'Supplier No.',
+						name: 'Lieferanten',
+						type: 'string',
+						default: '',
+						description: 'Supplier number (SQL parameter: Lieferanten / %L)',
+					},
+					{
+						displayName: 'Value Range From',
+						name: 'WertebereichVon',
+						type: 'number',
+						default: 0,
+						description: 'Numeric start value for value range filter (SQL parameter: WertebereichVon / %WBV)',
+					},
+					{
+						displayName: 'Value Range To',
+						name: 'WertebereichBis',
+						type: 'number',
+						default: 0,
+						description: 'Numeric end value for value range filter (SQL parameter: WertebereichBis / %WBB)',
 					},
 					{
 						displayName: 'Variable 1',
 						name: 'Variable1',
 						type: 'string',
 						default: '',
-						description: 'Freier Textwert (SQL-Parameter: Variable1 / %V1)',
+						description: 'Free text value (SQL parameter: Variable1 / %V1)',
 					},
 					{
-						displayName: 'Wertebereich Bis',
-						name: 'WertebereichBis',
-						type: 'number',
-						default: 0,
-						description: 'Numerischer Endwert für Wertebereich-Filter (SQL-Parameter: WertebereichBis / %WBB)',
-					},
-					{
-						displayName: 'Wertebereich Von',
-						name: 'WertebereichVon',
-						type: 'number',
-						default: 0,
-						description: 'Numerischer Startwert für Wertebereich-Filter (SQL-Parameter: WertebereichVon / %WBV)',
+						displayName: 'Warehouse',
+						name: 'Lagerort',
+						type: 'string',
+						default: '',
+						description: 'Warehouse abbreviation (SQL parameter: Lagerort / %Lo)',
 					},
 				],
 			},
@@ -229,7 +229,7 @@ export class TaxMetallStatistics implements INodeType {
 		usableAsTool: true,
 	};
 
-	// ─── Dynamische Optionen ────────────────────────────────────────────────────
+	// ─── Dynamic options ────────────────────────────────────────────────────────
 	methods = {
 		loadOptions: {
 			async getStatistics(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
@@ -251,7 +251,7 @@ export class TaxMetallStatistics implements INodeType {
 				} catch (error) {
 					throw new NodeOperationError(
 						this.getNode(),
-						`Statistikliste konnte nicht geladen werden: ${(error as Error).message}`,
+						`Failed to load statistics list: ${(error as Error).message}`,
 					);
 				}
 
@@ -264,14 +264,14 @@ export class TaxMetallStatistics implements INodeType {
 					value: stat.id,
 					description:
 						stat.parameters.length > 0
-							? `Benötigte Parameter: ${stat.parameters.join(', ')}`
-							: 'Keine Parameter erforderlich',
+							? `Required parameters: ${stat.parameters.join(', ')}`
+							: 'No parameters required',
 				}));
 			},
 		},
 	};
 
-	// ─── Ausführung ─────────────────────────────────────────────────────────────
+	// ─── Execution ──────────────────────────────────────────────────────────────
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
 		const items = this.getInputData();
 		const returnData: INodeExecutionData[] = [];
@@ -288,10 +288,10 @@ export class TaxMetallStatistics implements INodeType {
 			try {
 				const statisticId = this.getNodeParameter('statisticId', i) as string;
 
-				// Parameter-Objekt aufbauen — nur befüllte Werte werden übermittelt
+				// Build parameter object — only non-empty values are sent
 				const parameters: Record<string, string | number> = {};
 
-				// Datums-Parameter: n8n liefert ISO-8601 ("2024-01-01T00:00:00.000Z") → "YYYY-MM-DD"
+				// Date parameters: n8n provides ISO-8601 ("2024-01-01T00:00:00.000Z") → "YYYY-MM-DD"
 				const datumVon = this.getNodeParameter('datumVon', i) as string;
 				if (datumVon) parameters['DatumVon'] = datumVon.substring(0, 10);
 
@@ -304,7 +304,7 @@ export class TaxMetallStatistics implements INodeType {
 				const vergleichBis = this.getNodeParameter('vergleichBis', i) as string;
 				if (vergleichBis) parameters['VergleichBis'] = vergleichBis.substring(0, 10);
 
-				// Weitere Parameter aus der Collection — leere Strings und 0-Zahlen überspringen
+				// Additional parameters from collection — skip empty strings and zero numbers
 				const weitereParameter = this.getNodeParameter(
 					'weitereParameter',
 					i,
@@ -331,7 +331,7 @@ export class TaxMetallStatistics implements INodeType {
 					...executionData.map((item) => ({ ...item, pairedItem: { item: i } })),
 				);
 			} catch (error) {
-				// Versuche den Server-Antwort-Body zu extrahieren (bei 4xx/5xx Fehlern)
+				// Try to extract the server response body (for 4xx/5xx errors)
 				type HttpError = { response?: { body?: unknown }; cause?: { response?: { body?: unknown } } };
 			const err = error as HttpError;
 			const responseBody = err?.response?.body ?? err?.cause?.response?.body;

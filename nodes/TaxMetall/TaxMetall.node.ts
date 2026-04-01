@@ -14,33 +14,33 @@ export class TaxMetall implements INodeType {
 		group: ['transform'],
 		version: 1,
 		description:
-			'n8n Integration zur Anbindung und Automatisierung von Prozessen im TaxMetall SQL Edition ERP-System (Vectotax Software GmbH)',
+			'n8n integration for connecting and automating processes in the TaxMetall SQL Edition ERP system (Vectotax Software GmbH)',
 		subtitle: `={{
 			({
-				akquise: 'Akquise',
-				offer: 'Angebot',
-				article: 'Artikel',
-				auftrag: 'Auftrag',
-				eingangsrechnung: 'Eingangsrechnung',
-				customer: 'Kunde',
-				lieferant: 'Lieferant',
-				lieferschein: 'Lieferschein',
-				mahnung: 'Mahnung',
-				rechnung: 'Rechnung',
+				akquise: 'Acquisition',
+				offer: 'Offer',
+				article: 'Article',
+				auftrag: 'Order',
+				eingangsrechnung: 'Purchase Invoice',
+				customer: 'Customer',
+				lieferant: 'Supplier',
+				lieferschein: 'Delivery Note',
+				mahnung: 'Dunning',
+				rechnung: 'Invoice',
 			}[$parameter["resource"]] ?? $parameter["resource"])
 			+ ' · ' +
 			({
-				create: 'Erstellen',
-				getById: 'Nach ID suchen',
-				getByName: 'Nach Name suchen',
-				getByArticleNumber: 'Nach Artikelnr. suchen',
-				getByDrawingNumber: 'Nach Zeichnungsnr. suchen',
-				getByOrderId: 'Nach Auftrags-ID suchen',
-				getByCustomer: 'Nach Kundennr. suchen',
-				getByArticle: 'Nach Artikel suchen',
-				getBySupplier: 'Nach Lieferant suchen',
-				getByDateRange: 'Nach Zeitraum suchen',
-				getStatus: 'Status abrufen',
+				create: 'Create',
+				getById: 'Search by ID',
+				getByName: 'Search by Name',
+				getByArticleNumber: 'Search by Article No.',
+				getByDrawingNumber: 'Search by Drawing No.',
+				getByOrderId: 'Search by Order ID',
+				getByCustomer: 'Search by Customer No.',
+				getByArticle: 'Search by Article',
+				getBySupplier: 'Search by Supplier',
+				getByDateRange: 'Search by Date Range',
+				getStatus: 'Get Status',
 			}[$parameter["operation"]] ?? $parameter["operation"])
 		}}`,
 		defaults: {
@@ -55,169 +55,169 @@ export class TaxMetall implements INodeType {
 			},
 		],
 		properties: [
-			// ─── RESSOURCE ───────────────────────────────────────────────────────────
+			// ─── RESOURCE ────────────────────────────────────────────────────────────
 			{
-				displayName: 'Ressource',
+				displayName: 'Resource',
 				name: 'resource',
 				type: 'options',
 				noDataExpression: true,
 				options: [
-					{ name: 'Akquise', value: 'akquise' },
-					{ name: 'Angebot', value: 'offer' },
-					{ name: 'Artikel', value: 'article' },
-					{ name: 'Auftrag', value: 'auftrag' },
-					{ name: 'Eingangsrechnung', value: 'eingangsrechnung' },
-					{ name: 'Kunde', value: 'customer' },
-					{ name: 'Lieferant', value: 'lieferant' },
-					{ name: 'Lieferschein', value: 'lieferschein' },
-					{ name: 'Mahnung', value: 'mahnung' },
-					{ name: 'Rechnung', value: 'rechnung' },
+					{ name: 'Acquisition', value: 'akquise' },
+					{ name: 'Article', value: 'article' },
+					{ name: 'Customer', value: 'customer' },
+					{ name: 'Delivery Note', value: 'lieferschein' },
+					{ name: 'Dunning', value: 'mahnung' },
+					{ name: 'Invoice', value: 'rechnung' },
+					{ name: 'Offer', value: 'offer' },
+					{ name: 'Order', value: 'auftrag' },
+					{ name: 'Purchase Invoice', value: 'eingangsrechnung' },
+					{ name: 'Supplier', value: 'lieferant' },
 				],
 				default: 'article',
 			},
 
-			// ─── VORGÄNGE ─────────────────────────────────────────────────────────────
+			// ─── OPERATIONS ───────────────────────────────────────────────────────────
 
-			// Artikel
+			// Article
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['article'] } },
 				options: [
-					{ name: 'Nach Artikel-ID Suchen', value: 'getById', action: 'Nach artikel id suchen an article',},
-					{ name: 'Nach Artikelnummer Suchen', value: 'getByArticleNumber', action: 'Nach artikelnummer suchen an article',},
-					{ name: 'Nach Bezeichnung Suchen', value: 'getByName', action: 'Nach bezeichnung suchen an article',},
-					{ name: 'Nach Zeichnungsnummer Suchen', value: 'getByDrawingNumber', action: 'Nach zeichnungsnummer suchen an article',},
+					{ name: 'Search by Article ID', value: 'getById', action: 'Search by article ID in article' },
+					{ name: 'Search by Article Number', value: 'getByArticleNumber', action: 'Search by article number in article' },
+					{ name: 'Search by Drawing Number', value: 'getByDrawingNumber', action: 'Search by drawing number in article' },
+					{ name: 'Search by Name', value: 'getByName', action: 'Search by name in article' },
 				],
 				default: 'getByDrawingNumber',
 				noDataExpression: true,
 			},
-			// Auftrag
+			// Order
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['auftrag'] } },
 				options: [
-					{ name: 'Auftragsstatus Abrufen', value: 'getStatus', action: 'Auftragsstatus abrufen an auftrag',},
-					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen an auftrag',},
+					{ name: 'Get Order Status', value: 'getStatus', action: 'Get order status in order' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in order' },
 				],
 				default: 'getStatus',
 				noDataExpression: true,
 			},
-			// Eingangsrechnung
+			// Purchase Invoice
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['eingangsrechnung'] } },
 				options: [
-					{ name: 'Nach ER-Nr. Suchen', value: 'getById', action: 'Nach er nr suchen an eingangsrechnung',},
-					{ name: 'Nach Lieferant Suchen', value: 'getBySupplier', action: 'Nach lieferant suchen an eingangsrechnung',},
-					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen an eingangsrechnung',},
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in purchase invoice' },
+					{ name: 'Search by Purchase Invoice No.', value: 'getById', action: 'Search by purchase invoice number in purchase invoice' },
+					{ name: 'Search by Supplier', value: 'getBySupplier', action: 'Search by supplier in purchase invoice' },
 				],
 				default: 'getById',
 				noDataExpression: true,
 			},
-			// Kunde
+			// Customer
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['customer'] } },
 				options: [
-					{ name: 'Nach ID Suchen', value: 'getById', action: 'Nach ID suchen a customer',},
-					{ name: 'Nach Name Suchen', value: 'getByName', action: 'Nach name suchen a customer',},
-					{ name: 'Nach OrderID Suchen', value: 'getByOrderId', action: 'Nach order id suchen a customer',},
+					{ name: 'Search by ID', value: 'getById', action: 'Search by ID in customer' },
+					{ name: 'Search by Name', value: 'getByName', action: 'Search by name in customer' },
+					{ name: 'Search by Order ID', value: 'getByOrderId', action: 'Search by order ID in customer' },
 				],
 				default: 'getByName',
 				noDataExpression: true,
 			},
-			// Lieferant
+			// Supplier
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['lieferant'] } },
 				options: [
-					{ name: 'Nach ID Suchen', value: 'getById', action: 'Nach ID suchen a lieferant',},
-					{ name: 'Nach Name Suchen', value: 'getByName', action: 'Nach name suchen a lieferant',},
-					{ name: 'Nach Artikel Suchen', value: 'getByArticle', action: 'Nach artikel suchen a lieferant',},
+					{ name: 'Search by Article', value: 'getByArticle', action: 'Search by article in supplier' },
+					{ name: 'Search by ID', value: 'getById', action: 'Search by ID in supplier' },
+					{ name: 'Search by Name', value: 'getByName', action: 'Search by name in supplier' },
 				],
 				default: 'getById',
 				noDataExpression: true,
 			},
-			// Lieferschein
+			// Delivery Note
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['lieferschein'] } },
 				options: [
-					{ name: 'Nach Lieferschein-Nr. Suchen', value: 'getById', action: 'Nach lieferschein nr suchen a lieferschein',},
-					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen a lieferschein',},
-					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen a lieferschein',},
+					{ name: 'Search by Customer No.', value: 'getByCustomer', action: 'Search by customer number in delivery note' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in delivery note' },
+					{ name: 'Search by Delivery Note No.', value: 'getById', action: 'Search by delivery note number in delivery note' },
 				],
 				default: 'getById',
 				noDataExpression: true,
 			},
-			// Mahnung
+			// Dunning
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['mahnung'] } },
 				options: [
-					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen a mahnung',},
-					{ name: 'Nach Fälligkeitszeitraum Suchen', value: 'getByDateRange', action: 'Nach f lligkeitszeitraum suchen a mahnung',},
+					{ name: 'Search by Customer No.', value: 'getByCustomer', action: 'Search by customer number in dunning' },
+					{ name: 'Search by Due Date Range', value: 'getByDateRange', action: 'Search by due date range in dunning' },
 				],
 				default: 'getByCustomer',
 				noDataExpression: true,
 			},
-			// Rechnung
+			// Invoice
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['rechnung'] } },
 				options: [
-					{ name: 'Nach Rechnungs-Nr. Suchen', value: 'getById', action: 'Nach rechnungs nr suchen a rechnung',},
-					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen a rechnung',},
-					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen a rechnung',},
+					{ name: 'Search by Customer No.', value: 'getByCustomer', action: 'Search by customer number in invoice' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in invoice' },
+					{ name: 'Search by Invoice No.', value: 'getById', action: 'Search by invoice number in invoice' },
 				],
 				default: 'getById',
 				noDataExpression: true,
 			},
-			// Angebot
+			// Offer
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['offer'] } },
 				options: [
-					{ name: 'Erstellen', value: 'create', action: 'Erstellen an offer',},
-					{ name: 'Nach Angebots-Nr. Suchen', value: 'getById', action: 'Nach angebots nr suchen an offer',},
-					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen an offer',},
-					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen an offer',},
+					{ name: 'Create', value: 'create', action: 'Create an offer' },
+					{ name: 'Search by Customer No.', value: 'getByCustomer', action: 'Search by customer number in offer' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in offer' },
+					{ name: 'Search by Offer No.', value: 'getById', action: 'Search by offer number in offer' },
 				],
 				default: 'create',
 				noDataExpression: true,
 			},
-			// Akquise
+			// Acquisition
 			{
-				displayName: 'Vorgang',
+				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['akquise'] } },
-				options: [{ name: 'Erstellen', value: 'create', action: 'Erstellen an akquise',}],
+				options: [{ name: 'Create', value: 'create', action: 'Create an acquisition' }],
 				default: 'create',
 				noDataExpression: true,
 			},
 
-			// ─── PARAMETER: Artikel ───────────────────────────────────────────────────
+			// ─── PARAMETERS: Article ──────────────────────────────────────────────────
 			{
-				displayName: 'Artikel ID',
+				displayName: 'Article ID',
 				name: 'articleId',
 				type: 'string',
 				required: true,
@@ -225,7 +225,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Artikelnummer',
+				displayName: 'Article Number',
 				name: 'articleNumber',
 				type: 'string',
 				required: true,
@@ -233,7 +233,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Bezeichnung',
+				displayName: 'Name',
 				name: 'articleName',
 				type: 'string',
 				required: true,
@@ -241,7 +241,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Zeichnungsnummer',
+				displayName: 'Drawing Number',
 				name: 'drawingNumber',
 				type: 'string',
 				required: true,
@@ -249,57 +249,57 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 
-			// ─── PARAMETER: Auftrag ───────────────────────────────────────────────────
+			// ─── PARAMETERS: Order ────────────────────────────────────────────────────
 			{
-				displayName: 'Auftragsnummer',
+				displayName: 'Order Number',
 				name: 'auftragsNr',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['auftrag'], operation: ['getStatus'] } },
 				default: '',
-				description: 'Interne Auftragsnummer (Auftragnr)',
+				description: 'Internal order number (Auftragnr)',
 			},
 			{
-				displayName: 'Datum Von',
+				displayName: 'Date From',
 				name: 'auftragVon',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['auftrag'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Startdatum im Format yyyy-mm-dd',
+				description: 'Start date in format yyyy-mm-dd',
 				placeholder: '2024-01-01',
 			},
 			{
-				displayName: 'Datum Bis',
+				displayName: 'Date To',
 				name: 'auftragBis',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['auftrag'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Enddatum im Format yyyy-mm-dd',
+				description: 'End date in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
 			},
 
-			// ─── PARAMETER: Eingangsrechnung ──────────────────────────────────────────
+			// ─── PARAMETERS: Purchase Invoice ─────────────────────────────────────────
 			{
-				displayName: 'ER-Nummer',
+				displayName: 'Purchase Invoice Number',
 				name: 'erNr',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getById'] } },
 				default: '',
-				description: 'Eingangsrechnungs-Nummer (ERNr)',
+				description: 'Purchase invoice number (ERNr)',
 			},
 			{
-				displayName: 'Lieferantennummer (Optional)',
+				displayName: 'Supplier Number (Optional)',
 				name: 'erLieferNr',
 				type: 'string',
 				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getById'] } },
 				default: '',
-				description: 'Lieferantennummer zur Einschränkung bei mehreren Einträgen mit gleicher ERNr',
+				description: 'Supplier number to narrow results when multiple entries share the same purchase invoice number',
 			},
 			{
-				displayName: 'Lieferantennummer',
+				displayName: 'Supplier Number',
 				name: 'erLieferantNr',
 				type: 'string',
 				required: true,
@@ -307,29 +307,29 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Datum Von',
+				displayName: 'Date From',
 				name: 'erVon',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Startdatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				description: 'Start date (invoice date) in format yyyy-mm-dd',
 				placeholder: '2024-01-01',
 			},
 			{
-				displayName: 'Datum Bis',
+				displayName: 'Date To',
 				name: 'erBis',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Enddatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				description: 'End date (invoice date) in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
 			},
 
-			// ─── PARAMETER: Kunde ─────────────────────────────────────────────────────
+			// ─── PARAMETERS: Customer ─────────────────────────────────────────────────
 			{
-				displayName: 'Kundenname',
+				displayName: 'Customer Name',
 				name: 'customerName',
 				type: 'string',
 				required: true,
@@ -337,7 +337,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Kunden ID',
+				displayName: 'Customer ID',
 				name: 'customerId',
 				type: 'string',
 				required: true,
@@ -353,9 +353,9 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 
-			// ─── PARAMETER: Lieferant ─────────────────────────────────────────────────
+			// ─── PARAMETERS: Supplier ─────────────────────────────────────────────────
 			{
-				displayName: 'Lieferantennummer',
+				displayName: 'Supplier Number',
 				name: 'lieferantId',
 				type: 'string',
 				required: true,
@@ -369,21 +369,21 @@ export class TaxMetall implements INodeType {
 				required: true,
 				displayOptions: { show: { resource: ['lieferant'], operation: ['getByName'] } },
 				default: '',
-				description: 'Suche nach Teil-Übereinstimmung im Lieferantennamen',
+				description: 'Search by partial match on supplier name',
 			},
 			{
-				displayName: 'Artikelnummer',
+				displayName: 'Article Number',
 				name: 'lieferantArtikelNr',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['lieferant'], operation: ['getByArticle'] } },
 				default: '',
-				description: 'Artikelnummer aus ArtikelLieferant_s',
+				description: 'Article number from the supplier-article assignment table',
 			},
 
-			// ─── PARAMETER: Lieferschein ──────────────────────────────────────────────
+			// ─── PARAMETERS: Delivery Note ────────────────────────────────────────────
 			{
-				displayName: 'Lieferscheinnummer',
+				displayName: 'Delivery Note Number',
 				name: 'lieferscheinNr',
 				type: 'string',
 				required: true,
@@ -391,7 +391,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Kundennummer',
+				displayName: 'Customer Number',
 				name: 'lieferscheinKundenNr',
 				type: 'string',
 				required: true,
@@ -399,29 +399,29 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Datum Von',
+				displayName: 'Date From',
 				name: 'lieferscheinVon',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['lieferschein'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Startdatum im Format yyyy-mm-dd',
+				description: 'Start date in format yyyy-mm-dd',
 				placeholder: '2024-01-01',
 			},
 			{
-				displayName: 'Datum Bis',
+				displayName: 'Date To',
 				name: 'lieferscheinBis',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['lieferschein'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Enddatum im Format yyyy-mm-dd',
+				description: 'End date in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
 			},
 
-			// ─── PARAMETER: Mahnung ───────────────────────────────────────────────────
+			// ─── PARAMETERS: Dunning ──────────────────────────────────────────────────
 			{
-				displayName: 'Kundennummer',
+				displayName: 'Customer Number',
 				name: 'mahnungKundenNr',
 				type: 'string',
 				required: true,
@@ -429,107 +429,107 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Optionale Filter',
+				displayName: 'Optional Filters',
 				name: 'mahnungFilterKunde',
 				type: 'collection',
-				placeholder: 'Filter hinzufügen',
+				placeholder: 'Add filter',
 				default: {},
 				displayOptions: { show: { resource: ['mahnung'], operation: ['getByCustomer'] } },
 				options: [
 					{
-						displayName: 'Bezahlte Einschließen',
-						name: 'bezahlt',
-						type: 'boolean',
-						default: false,
-						description: 'Whether bezahlte Posten (NotPayed = 0) einschließen',
-					},
-					{
-						displayName: 'Fälligkeitsdatum Bis',
-						name: 'bis',
-						type: 'string',
-						default: '',
-						description: 'Optionaler Zeitraumfilter: Enddatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
-						placeholder: '2024-12-31',
-					},
-					{
-						displayName: 'Fälligkeitsdatum Von',
+						displayName: 'Due Date From',
 						name: 'von',
 						type: 'string',
 						default: '',
-						description: 'Optionaler Zeitraumfilter: Startdatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+						description: 'Optional date filter: start date (due date) in format yyyy-mm-dd',
 						placeholder: '2024-01-01',
 					},
 					{
-						displayName: 'Gesperrte Einschließen',
-						name: 'mahnsperre',
-						type: 'boolean',
-						default: false,
-						description: 'Whether Posten mit Mahnsperre einschließen',
+						displayName: 'Due Date To',
+						name: 'bis',
+						type: 'string',
+						default: '',
+						description: 'Optional date filter: end date (due date) in format yyyy-mm-dd',
+						placeholder: '2024-12-31',
 					},
 					{
-						displayName: 'Mahnstufe',
+						displayName: 'Dunning Level',
 						name: 'mahnstufe',
 						type: 'number',
 						default: 0,
-						description: 'Nur Posten dieser Mahnstufe anzeigen (0 = alle)',
+						description: 'Show only items of this dunning level (0 = all)',
+					},
+					{
+						displayName: 'Include Blocked',
+						name: 'mahnsperre',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to include items with dunning block',
+					},
+					{
+						displayName: 'Include Paid',
+						name: 'bezahlt',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to include paid items (NotPayed = 0)',
 					},
 				],
 			},
 			{
-				displayName: 'Fälligkeitsdatum Von',
+				displayName: 'Due Date From',
 				name: 'mahnungVon',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['mahnung'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Startdatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+				description: 'Start date (due date) in format yyyy-mm-dd',
 				placeholder: '2024-01-01',
 			},
 			{
-				displayName: 'Fälligkeitsdatum Bis',
+				displayName: 'Due Date To',
 				name: 'mahnungBis',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['mahnung'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Enddatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+				description: 'End date (due date) in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
 			},
 			{
-				displayName: 'Optionale Filter',
+				displayName: 'Optional Filters',
 				name: 'mahnungFilter',
 				type: 'collection',
-				placeholder: 'Filter hinzufügen',
+				placeholder: 'Add filter',
 				default: {},
 				displayOptions: { show: { resource: ['mahnung'], operation: ['getByDateRange'] } },
 				options: [
 					{
-						displayName: 'Mahnstufe',
+						displayName: 'Dunning Level',
 						name: 'mahnstufe',
 						type: 'number',
 						default: 0,
-						description: 'Nur Posten dieser Mahnstufe anzeigen (0 = alle)',
+						description: 'Show only items of this dunning level (0 = all)',
 					},
 					{
-						displayName: 'Bezahlte Einschließen',
-						name: 'bezahlt',
-						type: 'boolean',
-						default: false,
-						description: 'Whether bezahlte Posten (NotPayed = 0) einschließen',
-					},
-					{
-						displayName: 'Gesperrte Einschließen',
+						displayName: 'Include Blocked',
 						name: 'mahnsperre',
 						type: 'boolean',
 						default: false,
-						description: 'Whether Posten mit Mahnsperre einschließen',
+						description: 'Whether to include items with dunning block',
+					},
+					{
+						displayName: 'Include Paid',
+						name: 'bezahlt',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to include paid items (NotPayed = 0)',
 					},
 				],
 			},
 
-			// ─── PARAMETER: Rechnung ──────────────────────────────────────────────────
+			// ─── PARAMETERS: Invoice ──────────────────────────────────────────────────
 			{
-				displayName: 'Rechnungsnummer',
+				displayName: 'Invoice Number',
 				name: 'rechnungNr',
 				type: 'string',
 				required: true,
@@ -537,7 +537,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Kundennummer',
+				displayName: 'Customer Number',
 				name: 'rechnungKundenNr',
 				type: 'string',
 				required: true,
@@ -545,29 +545,29 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Datum Von',
+				displayName: 'Date From',
 				name: 'rechnungVon',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['rechnung'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Startdatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				description: 'Start date (invoice date) in format yyyy-mm-dd',
 				placeholder: '2024-01-01',
 			},
 			{
-				displayName: 'Datum Bis',
+				displayName: 'Date To',
 				name: 'rechnungBis',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['rechnung'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Enddatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				description: 'End date (invoice date) in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
 			},
 
-			// ─── PARAMETER: Angebot ───────────────────────────────────────────────────
+			// ─── PARAMETERS: Offer ────────────────────────────────────────────────────
 			{
-				displayName: 'Kunden ID',
+				displayName: 'Customer ID',
 				name: 'offerCustId',
 				type: 'string',
 				required: true,
@@ -575,30 +575,30 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Artikel ID',
+				displayName: 'Article ID',
 				name: 'offerArtId',
 				type: 'number',
 				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
 				default: 0,
-				description: 'Numerische Artikel-ID (articleid). Alternativ Artikelnummer im Feld darunter angeben.',
+				description: 'Numeric article ID (articleid). Alternatively specify an article number in the field below.',
 			},
 			{
-				displayName: 'Artikelnummer',
+				displayName: 'Article Number',
 				name: 'offerArtNr',
 				type: 'string',
 				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
 				default: '',
-				description: 'Artikelnummer als Text (artikelnr). Wird verwendet wenn Artikel ID = 0.',
+				description: 'Article number as text (artikelnr). Used when Article ID = 0.',
 			},
 			{
-				displayName: 'Menge',
+				displayName: 'Quantity',
 				name: 'amount',
 				type: 'number',
 				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
 				default: 1,
 			},
 			{
-				displayName: 'Angebotsnummer',
+				displayName: 'Offer Number',
 				name: 'angebotNr',
 				type: 'string',
 				required: true,
@@ -606,7 +606,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Kundennummer',
+				displayName: 'Customer Number',
 				name: 'offerKundenNr',
 				type: 'string',
 				required: true,
@@ -614,29 +614,29 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Datum Von',
+				displayName: 'Date From',
 				name: 'offerVon',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['offer'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Startdatum (Angebotsdatum) im Format yyyy-mm-dd',
+				description: 'Start date (offer date) in format yyyy-mm-dd',
 				placeholder: '2024-01-01',
 			},
 			{
-				displayName: 'Datum Bis',
+				displayName: 'Date To',
 				name: 'offerBis',
 				type: 'string',
 				required: true,
 				displayOptions: { show: { resource: ['offer'], operation: ['getByDateRange'] } },
 				default: '',
-				description: 'Enddatum (Angebotsdatum) im Format yyyy-mm-dd',
+				description: 'End date (offer date) in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
 			},
 
-			// ─── PARAMETER: Akquise ───────────────────────────────────────────────────
+			// ─── PARAMETERS: Acquisition ──────────────────────────────────────────────
 			{
-				displayName: 'E-Mail',
+				displayName: 'Email',
 				name: 'email',
 				type: 'string',
 				placeholder: 'name@email.com',
@@ -645,7 +645,7 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Firma',
+				displayName: 'Company',
 				name: 'company',
 				type: 'string',
 				required: true,
@@ -653,28 +653,28 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
-				displayName: 'Zusätzliche Felder',
+				displayName: 'Additional Fields',
 				name: 'additionalFields',
 				type: 'collection',
-				placeholder: 'Feld hinzufügen',
+				placeholder: 'Add field',
 				default: {},
 				displayOptions: { show: { resource: ['akquise'] } },
 				options: [
-					{ displayName: 'Kampagneninfo', name: 'kampagneninfo', type: 'string', default: '' },
-					{ displayName: 'Land', name: 'land', type: 'string', default: '' },
-					{ displayName: 'Leadquelle', name: 'leadquelle', type: 'string', default: '' },
-					{ displayName: 'Nachname', name: 'nachname', type: 'string', default: '' },
-					{ displayName: 'Ort', name: 'ort', type: 'string', default: '' },
+					{ displayName: 'Campaign Info', name: 'kampagneninfo', type: 'string', default: '' },
+					{ displayName: 'City', name: 'ort', type: 'string', default: '' },
+					{ displayName: 'Country', name: 'land', type: 'string', default: '' },
+					{ displayName: 'First Name', name: 'vorname', type: 'string', default: '' },
+					{ displayName: 'Last Name', name: 'nachname', type: 'string', default: '' },
+					{ displayName: 'Lead Source', name: 'leadquelle', type: 'string', default: '' },
 					{
 						displayName: 'Perspective Lead ID',
 						name: 'perspectiveLeadId',
 						type: 'string',
 						default: '',
 					},
-					{ displayName: 'PLZ', name: 'plz', type: 'string', default: '' },
-					{ displayName: 'Straße', name: 'strasse', type: 'string', default: '' },
-					{ displayName: 'Telefon', name: 'telefon', type: 'string', default: '' },
-					{ displayName: 'Vorname', name: 'vorname', type: 'string', default: '' },
+					{ displayName: 'Phone', name: 'telefon', type: 'string', default: '' },
+					{ displayName: 'Postal Code', name: 'plz', type: 'string', default: '' },
+					{ displayName: 'Street', name: 'strasse', type: 'string', default: '' },
 				],
 			},
 		],
@@ -700,7 +700,7 @@ export class TaxMetall implements INodeType {
 
 				const baseUrl = credentials.baseUrl as string;
 
-				// ── Artikel ────────────────────────────────────────────────────────────
+				// ── Article ────────────────────────────────────────────────────────────
 				if (resource === 'article') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getById') {
@@ -721,7 +721,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Auftrag ────────────────────────────────────────────────────────────
+				// ── Order ──────────────────────────────────────────────────────────────
 				} else if (resource === 'auftrag') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getStatus') {
@@ -739,7 +739,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Eingangsrechnung ───────────────────────────────────────────────────
+				// ── Purchase Invoice ───────────────────────────────────────────────────
 				} else if (resource === 'eingangsrechnung') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getById') {
@@ -761,7 +761,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Kunde ──────────────────────────────────────────────────────────────
+				// ── Customer ───────────────────────────────────────────────────────────
 				} else if (resource === 'customer') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getByName') {
@@ -780,7 +780,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Lieferant ──────────────────────────────────────────────────────────
+				// ── Supplier ───────────────────────────────────────────────────────────
 				} else if (resource === 'lieferant') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getById') {
@@ -799,7 +799,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Lieferschein ───────────────────────────────────────────────────────
+				// ── Delivery Note ──────────────────────────────────────────────────────
 				} else if (resource === 'lieferschein') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getById') {
@@ -819,7 +819,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Mahnung ────────────────────────────────────────────────────────────
+				// ── Dunning ────────────────────────────────────────────────────────────
 				} else if (resource === 'mahnung') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getByCustomer') {
@@ -849,7 +849,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Rechnung ───────────────────────────────────────────────────────────
+				// ── Invoice ────────────────────────────────────────────────────────────
 				} else if (resource === 'rechnung') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getById') {
@@ -869,7 +869,7 @@ export class TaxMetall implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 
-				// ── Angebot ────────────────────────────────────────────────────────────
+				// ── Offer ──────────────────────────────────────────────────────────────
 				} else if (resource === 'offer') {
 					if (operation === 'create') {
 						const offerArtId = this.getNodeParameter('offerArtId', i) as number;
@@ -911,7 +911,7 @@ export class TaxMetall implements INodeType {
 						});
 					}
 
-				// ── Akquise ────────────────────────────────────────────────────────────
+				// ── Acquisition ────────────────────────────────────────────────────────
 				} else if (resource === 'akquise') {
 					const additionalFields = this.getNodeParameter('additionalFields', i) as Record<
 						string,
