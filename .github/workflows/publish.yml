@@ -9,7 +9,8 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write  # Required for provenance statement
+      id-token: write   # Required for provenance statement
+      contents: read    # Required to checkout the repository
     steps:
       - uses: actions/checkout@v4
 
