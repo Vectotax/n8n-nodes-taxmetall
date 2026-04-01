@@ -1,0 +1,959 @@
+import {
+	IExecuteFunctions,
+	INodeExecutionData,
+	INodeType,
+	INodeTypeDescription,
+	NodeConnectionTypes,
+} from 'n8n-workflow';
+
+export class TaxMetall implements INodeType {
+	description: INodeTypeDescription = {
+		displayName: 'TaxMetall',
+		name: 'taxMetall',
+		icon: 'file:VectotaxLogo.svg',
+		group: ['transform'],
+		version: 1,
+		description:
+			'n8n Integration zur Anbindung und Automatisierung von Prozessen im TaxMetall SQL Edition ERP-System (Vectotax Software GmbH)',
+		subtitle: `={{
+			({
+				akquise: 'Akquise',
+				offer: 'Angebot',
+				article: 'Artikel',
+				auftrag: 'Auftrag',
+				eingangsrechnung: 'Eingangsrechnung',
+				customer: 'Kunde',
+				lieferant: 'Lieferant',
+				lieferschein: 'Lieferschein',
+				mahnung: 'Mahnung',
+				rechnung: 'Rechnung',
+			}[$parameter["resource"]] ?? $parameter["resource"])
+			+ ' · ' +
+			({
+				create: 'Erstellen',
+				getById: 'Nach ID suchen',
+				getByName: 'Nach Name suchen',
+				getByArticleNumber: 'Nach Artikelnr. suchen',
+				getByDrawingNumber: 'Nach Zeichnungsnr. suchen',
+				getByOrderId: 'Nach Auftrags-ID suchen',
+				getByCustomer: 'Nach Kundennr. suchen',
+				getByArticle: 'Nach Artikel suchen',
+				getBySupplier: 'Nach Lieferant suchen',
+				getByDateRange: 'Nach Zeitraum suchen',
+				getStatus: 'Status abrufen',
+			}[$parameter["operation"]] ?? $parameter["operation"])
+		}}`,
+		defaults: {
+			name: 'TaxMetall',
+		},
+		inputs: [NodeConnectionTypes.Main],
+		outputs: [NodeConnectionTypes.Main],
+		credentials: [
+			{
+				name: 'taxMetallApi',
+				required: true,
+			},
+		],
+		properties: [
+			// ─── RESSOURCE ───────────────────────────────────────────────────────────
+			{
+				displayName: 'Ressource',
+				name: 'resource',
+				type: 'options',
+				noDataExpression: true,
+				options: [
+					{ name: 'Akquise', value: 'akquise' },
+					{ name: 'Angebot', value: 'offer' },
+					{ name: 'Artikel', value: 'article' },
+					{ name: 'Auftrag', value: 'auftrag' },
+					{ name: 'Eingangsrechnung', value: 'eingangsrechnung' },
+					{ name: 'Kunde', value: 'customer' },
+					{ name: 'Lieferant', value: 'lieferant' },
+					{ name: 'Lieferschein', value: 'lieferschein' },
+					{ name: 'Mahnung', value: 'mahnung' },
+					{ name: 'Rechnung', value: 'rechnung' },
+				],
+				default: 'article',
+			},
+
+			// ─── VORGÄNGE ─────────────────────────────────────────────────────────────
+
+			// Artikel
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['article'] } },
+				options: [
+					{ name: 'Nach Artikel-ID Suchen', value: 'getById', action: 'Nach artikel id suchen an article',},
+					{ name: 'Nach Artikelnummer Suchen', value: 'getByArticleNumber', action: 'Nach artikelnummer suchen an article',},
+					{ name: 'Nach Bezeichnung Suchen', value: 'getByName', action: 'Nach bezeichnung suchen an article',},
+					{ name: 'Nach Zeichnungsnummer Suchen', value: 'getByDrawingNumber', action: 'Nach zeichnungsnummer suchen an article',},
+				],
+				default: 'getByDrawingNumber',
+				noDataExpression: true,
+			},
+			// Auftrag
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['auftrag'] } },
+				options: [
+					{ name: 'Auftragsstatus Abrufen', value: 'getStatus', action: 'Auftragsstatus abrufen an auftrag',},
+					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen an auftrag',},
+				],
+				default: 'getStatus',
+				noDataExpression: true,
+			},
+			// Eingangsrechnung
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['eingangsrechnung'] } },
+				options: [
+					{ name: 'Nach ER-Nr. Suchen', value: 'getById', action: 'Nach er nr suchen an eingangsrechnung',},
+					{ name: 'Nach Lieferant Suchen', value: 'getBySupplier', action: 'Nach lieferant suchen an eingangsrechnung',},
+					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen an eingangsrechnung',},
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Kunde
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['customer'] } },
+				options: [
+					{ name: 'Nach ID Suchen', value: 'getById', action: 'Nach ID suchen a customer',},
+					{ name: 'Nach Name Suchen', value: 'getByName', action: 'Nach name suchen a customer',},
+					{ name: 'Nach OrderID Suchen', value: 'getByOrderId', action: 'Nach order id suchen a customer',},
+				],
+				default: 'getByName',
+				noDataExpression: true,
+			},
+			// Lieferant
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['lieferant'] } },
+				options: [
+					{ name: 'Nach ID Suchen', value: 'getById', action: 'Nach ID suchen a lieferant',},
+					{ name: 'Nach Name Suchen', value: 'getByName', action: 'Nach name suchen a lieferant',},
+					{ name: 'Nach Artikel Suchen', value: 'getByArticle', action: 'Nach artikel suchen a lieferant',},
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Lieferschein
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['lieferschein'] } },
+				options: [
+					{ name: 'Nach Lieferschein-Nr. Suchen', value: 'getById', action: 'Nach lieferschein nr suchen a lieferschein',},
+					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen a lieferschein',},
+					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen a lieferschein',},
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Mahnung
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['mahnung'] } },
+				options: [
+					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen a mahnung',},
+					{ name: 'Nach Fälligkeitszeitraum Suchen', value: 'getByDateRange', action: 'Nach f lligkeitszeitraum suchen a mahnung',},
+				],
+				default: 'getByCustomer',
+				noDataExpression: true,
+			},
+			// Rechnung
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['rechnung'] } },
+				options: [
+					{ name: 'Nach Rechnungs-Nr. Suchen', value: 'getById', action: 'Nach rechnungs nr suchen a rechnung',},
+					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen a rechnung',},
+					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen a rechnung',},
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Angebot
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['offer'] } },
+				options: [
+					{ name: 'Erstellen', value: 'create', action: 'Erstellen an offer',},
+					{ name: 'Nach Angebots-Nr. Suchen', value: 'getById', action: 'Nach angebots nr suchen an offer',},
+					{ name: 'Nach Kundennr. Suchen', value: 'getByCustomer', action: 'Nach kundennr suchen an offer',},
+					{ name: 'Nach Zeitraum Suchen', value: 'getByDateRange', action: 'Nach zeitraum suchen an offer',},
+				],
+				default: 'create',
+				noDataExpression: true,
+			},
+			// Akquise
+			{
+				displayName: 'Vorgang',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['akquise'] } },
+				options: [{ name: 'Erstellen', value: 'create', action: 'Erstellen an akquise',}],
+				default: 'create',
+				noDataExpression: true,
+			},
+
+			// ─── PARAMETER: Artikel ───────────────────────────────────────────────────
+			{
+				displayName: 'Artikel ID',
+				name: 'articleId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['article'], operation: ['getById'] } },
+				default: '',
+			},
+			{
+				displayName: 'Artikelnummer',
+				name: 'articleNumber',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['article'], operation: ['getByArticleNumber'] } },
+				default: '',
+			},
+			{
+				displayName: 'Bezeichnung',
+				name: 'articleName',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['article'], operation: ['getByName'] } },
+				default: '',
+			},
+			{
+				displayName: 'Zeichnungsnummer',
+				name: 'drawingNumber',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['article'], operation: ['getByDrawingNumber'] } },
+				default: '',
+			},
+
+			// ─── PARAMETER: Auftrag ───────────────────────────────────────────────────
+			{
+				displayName: 'Auftragsnummer',
+				name: 'auftragsNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['auftrag'], operation: ['getStatus'] } },
+				default: '',
+				description: 'Interne Auftragsnummer (Auftragnr)',
+			},
+			{
+				displayName: 'Datum Von',
+				name: 'auftragVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['auftrag'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Startdatum im Format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Datum Bis',
+				name: 'auftragBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['auftrag'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Enddatum im Format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+
+			// ─── PARAMETER: Eingangsrechnung ──────────────────────────────────────────
+			{
+				displayName: 'ER-Nummer',
+				name: 'erNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getById'] } },
+				default: '',
+				description: 'Eingangsrechnungs-Nummer (ERNr)',
+			},
+			{
+				displayName: 'Lieferantennummer (Optional)',
+				name: 'erLieferNr',
+				type: 'string',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getById'] } },
+				default: '',
+				description: 'Lieferantennummer zur Einschränkung bei mehreren Einträgen mit gleicher ERNr',
+			},
+			{
+				displayName: 'Lieferantennummer',
+				name: 'erLieferantNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getBySupplier'] } },
+				default: '',
+			},
+			{
+				displayName: 'Datum Von',
+				name: 'erVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Startdatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Datum Bis',
+				name: 'erBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Enddatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+
+			// ─── PARAMETER: Kunde ─────────────────────────────────────────────────────
+			{
+				displayName: 'Kundenname',
+				name: 'customerName',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['customer'], operation: ['getByName'] } },
+				default: '',
+			},
+			{
+				displayName: 'Kunden ID',
+				name: 'customerId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['customer'], operation: ['getById'] } },
+				default: '',
+			},
+			{
+				displayName: 'Order ID',
+				name: 'orderId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['customer'], operation: ['getByOrderId'] } },
+				default: '',
+			},
+
+			// ─── PARAMETER: Lieferant ─────────────────────────────────────────────────
+			{
+				displayName: 'Lieferantennummer',
+				name: 'lieferantId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferant'], operation: ['getById'] } },
+				default: '',
+			},
+			{
+				displayName: 'Name',
+				name: 'lieferantName',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferant'], operation: ['getByName'] } },
+				default: '',
+				description: 'Suche nach Teil-Übereinstimmung im Lieferantennamen',
+			},
+			{
+				displayName: 'Artikelnummer',
+				name: 'lieferantArtikelNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferant'], operation: ['getByArticle'] } },
+				default: '',
+				description: 'Artikelnummer aus ArtikelLieferant_s',
+			},
+
+			// ─── PARAMETER: Lieferschein ──────────────────────────────────────────────
+			{
+				displayName: 'Lieferscheinnummer',
+				name: 'lieferscheinNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferschein'], operation: ['getById'] } },
+				default: '',
+			},
+			{
+				displayName: 'Kundennummer',
+				name: 'lieferscheinKundenNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferschein'], operation: ['getByCustomer'] } },
+				default: '',
+			},
+			{
+				displayName: 'Datum Von',
+				name: 'lieferscheinVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferschein'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Startdatum im Format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Datum Bis',
+				name: 'lieferscheinBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferschein'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Enddatum im Format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+
+			// ─── PARAMETER: Mahnung ───────────────────────────────────────────────────
+			{
+				displayName: 'Kundennummer',
+				name: 'mahnungKundenNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['mahnung'], operation: ['getByCustomer'] } },
+				default: '',
+			},
+			{
+				displayName: 'Optionale Filter',
+				name: 'mahnungFilterKunde',
+				type: 'collection',
+				placeholder: 'Filter hinzufügen',
+				default: {},
+				displayOptions: { show: { resource: ['mahnung'], operation: ['getByCustomer'] } },
+				options: [
+					{
+						displayName: 'Bezahlte Einschließen',
+						name: 'bezahlt',
+						type: 'boolean',
+						default: false,
+						description: 'Whether bezahlte Posten (NotPayed = 0) einschließen',
+					},
+					{
+						displayName: 'Fälligkeitsdatum Bis',
+						name: 'bis',
+						type: 'string',
+						default: '',
+						description: 'Optionaler Zeitraumfilter: Enddatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+						placeholder: '2024-12-31',
+					},
+					{
+						displayName: 'Fälligkeitsdatum Von',
+						name: 'von',
+						type: 'string',
+						default: '',
+						description: 'Optionaler Zeitraumfilter: Startdatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+						placeholder: '2024-01-01',
+					},
+					{
+						displayName: 'Gesperrte Einschließen',
+						name: 'mahnsperre',
+						type: 'boolean',
+						default: false,
+						description: 'Whether Posten mit Mahnsperre einschließen',
+					},
+					{
+						displayName: 'Mahnstufe',
+						name: 'mahnstufe',
+						type: 'number',
+						default: 0,
+						description: 'Nur Posten dieser Mahnstufe anzeigen (0 = alle)',
+					},
+				],
+			},
+			{
+				displayName: 'Fälligkeitsdatum Von',
+				name: 'mahnungVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['mahnung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Startdatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Fälligkeitsdatum Bis',
+				name: 'mahnungBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['mahnung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Enddatum (Fälligkeitsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+			{
+				displayName: 'Optionale Filter',
+				name: 'mahnungFilter',
+				type: 'collection',
+				placeholder: 'Filter hinzufügen',
+				default: {},
+				displayOptions: { show: { resource: ['mahnung'], operation: ['getByDateRange'] } },
+				options: [
+					{
+						displayName: 'Mahnstufe',
+						name: 'mahnstufe',
+						type: 'number',
+						default: 0,
+						description: 'Nur Posten dieser Mahnstufe anzeigen (0 = alle)',
+					},
+					{
+						displayName: 'Bezahlte Einschließen',
+						name: 'bezahlt',
+						type: 'boolean',
+						default: false,
+						description: 'Whether bezahlte Posten (NotPayed = 0) einschließen',
+					},
+					{
+						displayName: 'Gesperrte Einschließen',
+						name: 'mahnsperre',
+						type: 'boolean',
+						default: false,
+						description: 'Whether Posten mit Mahnsperre einschließen',
+					},
+				],
+			},
+
+			// ─── PARAMETER: Rechnung ──────────────────────────────────────────────────
+			{
+				displayName: 'Rechnungsnummer',
+				name: 'rechnungNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['rechnung'], operation: ['getById'] } },
+				default: '',
+			},
+			{
+				displayName: 'Kundennummer',
+				name: 'rechnungKundenNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['rechnung'], operation: ['getByCustomer'] } },
+				default: '',
+			},
+			{
+				displayName: 'Datum Von',
+				name: 'rechnungVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['rechnung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Startdatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Datum Bis',
+				name: 'rechnungBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['rechnung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Enddatum (Rechnungsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+
+			// ─── PARAMETER: Angebot ───────────────────────────────────────────────────
+			{
+				displayName: 'Kunden ID',
+				name: 'offerCustId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				default: '',
+			},
+			{
+				displayName: 'Artikel ID',
+				name: 'offerArtId',
+				type: 'number',
+				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				default: 0,
+				description: 'Numerische Artikel-ID (articleid). Alternativ Artikelnummer im Feld darunter angeben.',
+			},
+			{
+				displayName: 'Artikelnummer',
+				name: 'offerArtNr',
+				type: 'string',
+				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				default: '',
+				description: 'Artikelnummer als Text (artikelnr). Wird verwendet wenn Artikel ID = 0.',
+			},
+			{
+				displayName: 'Menge',
+				name: 'amount',
+				type: 'number',
+				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				default: 1,
+			},
+			{
+				displayName: 'Angebotsnummer',
+				name: 'angebotNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['offer'], operation: ['getById'] } },
+				default: '',
+			},
+			{
+				displayName: 'Kundennummer',
+				name: 'offerKundenNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['offer'], operation: ['getByCustomer'] } },
+				default: '',
+			},
+			{
+				displayName: 'Datum Von',
+				name: 'offerVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['offer'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Startdatum (Angebotsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Datum Bis',
+				name: 'offerBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['offer'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Enddatum (Angebotsdatum) im Format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+
+			// ─── PARAMETER: Akquise ───────────────────────────────────────────────────
+			{
+				displayName: 'E-Mail',
+				name: 'email',
+				type: 'string',
+				placeholder: 'name@email.com',
+				required: true,
+				displayOptions: { show: { resource: ['akquise'] } },
+				default: '',
+			},
+			{
+				displayName: 'Firma',
+				name: 'company',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['akquise'] } },
+				default: '',
+			},
+			{
+				displayName: 'Zusätzliche Felder',
+				name: 'additionalFields',
+				type: 'collection',
+				placeholder: 'Feld hinzufügen',
+				default: {},
+				displayOptions: { show: { resource: ['akquise'] } },
+				options: [
+					{ displayName: 'Kampagneninfo', name: 'kampagneninfo', type: 'string', default: '' },
+					{ displayName: 'Land', name: 'land', type: 'string', default: '' },
+					{ displayName: 'Leadquelle', name: 'leadquelle', type: 'string', default: '' },
+					{ displayName: 'Nachname', name: 'nachname', type: 'string', default: '' },
+					{ displayName: 'Ort', name: 'ort', type: 'string', default: '' },
+					{
+						displayName: 'Perspective Lead ID',
+						name: 'perspectiveLeadId',
+						type: 'string',
+						default: '',
+					},
+					{ displayName: 'PLZ', name: 'plz', type: 'string', default: '' },
+					{ displayName: 'Straße', name: 'strasse', type: 'string', default: '' },
+					{ displayName: 'Telefon', name: 'telefon', type: 'string', default: '' },
+					{ displayName: 'Vorname', name: 'vorname', type: 'string', default: '' },
+				],
+			},
+		],
+		usableAsTool: true,
+	};
+
+	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
+		const items = this.getInputData();
+		const returnData: INodeExecutionData[] = [];
+		const credentials = await this.getCredentials('taxMetallApi');
+
+		for (let i = 0; i < items.length; i++) {
+			try {
+				const resource = this.getNodeParameter('resource', i) as string;
+				const operation = this.getNodeParameter('operation', i) as string;
+				let responseData;
+
+				const headers = {
+					'tax-api-key': credentials.apiKey as string,
+					'ngrok-skip-browser-warning': 'true',
+					'Content-Type': 'application/json',
+				};
+
+				const baseUrl = credentials.baseUrl as string;
+
+				// ── Artikel ────────────────────────────────────────────────────────────
+				if (resource === 'article') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getById') {
+						qs.aid = this.getNodeParameter('articleId', i) as string;
+					} else if (operation === 'getByArticleNumber') {
+						qs.artikelnr = this.getNodeParameter('articleNumber', i) as string;
+					} else if (operation === 'getByName') {
+						qs.name = this.getNodeParameter('articleName', i) as string;
+					} else if (operation === 'getByDrawingNumber') {
+						qs.zeichnungsnr = this.getNodeParameter('drawingNumber', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-articles`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Auftrag ────────────────────────────────────────────────────────────
+				} else if (resource === 'auftrag') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getStatus') {
+						qs.auftragnr = this.getNodeParameter('auftragsNr', i) as string;
+					} else if (operation === 'getByDateRange') {
+						qs.von = this.getNodeParameter('auftragVon', i) as string;
+						qs.bis = this.getNodeParameter('auftragBis', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-orders`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Eingangsrechnung ───────────────────────────────────────────────────
+				} else if (resource === 'eingangsrechnung') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getById') {
+						qs.ernr = this.getNodeParameter('erNr', i) as string;
+						const erLieferNr = this.getNodeParameter('erLieferNr', i) as string;
+						if (erLieferNr) qs.liefernr = erLieferNr;
+					} else if (operation === 'getBySupplier') {
+						qs.liefernr = this.getNodeParameter('erLieferantNr', i) as string;
+					} else if (operation === 'getByDateRange') {
+						qs.von = this.getNodeParameter('erVon', i) as string;
+						qs.bis = this.getNodeParameter('erBis', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-purchase-invoices`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Kunde ──────────────────────────────────────────────────────────────
+				} else if (resource === 'customer') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getByName') {
+						qs.name = this.getNodeParameter('customerName', i) as string;
+					} else if (operation === 'getById') {
+						qs.kundennr = this.getNodeParameter('customerId', i) as string;
+					} else if (operation === 'getByOrderId') {
+						qs.auftragnr = this.getNodeParameter('orderId', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-customers`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Lieferant ──────────────────────────────────────────────────────────
+				} else if (resource === 'lieferant') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getById') {
+						qs.liefernr = this.getNodeParameter('lieferantId', i) as string;
+					} else if (operation === 'getByName') {
+						qs.name = this.getNodeParameter('lieferantName', i) as string;
+					} else if (operation === 'getByArticle') {
+						qs.artikelnr = this.getNodeParameter('lieferantArtikelNr', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-suppliers`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Lieferschein ───────────────────────────────────────────────────────
+				} else if (resource === 'lieferschein') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getById') {
+						qs.lieferscheinnr = this.getNodeParameter('lieferscheinNr', i) as string;
+					} else if (operation === 'getByCustomer') {
+						qs.kundennr = this.getNodeParameter('lieferscheinKundenNr', i) as string;
+					} else if (operation === 'getByDateRange') {
+						qs.von = this.getNodeParameter('lieferscheinVon', i) as string;
+						qs.bis = this.getNodeParameter('lieferscheinBis', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-delivery-notes`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Mahnung ────────────────────────────────────────────────────────────
+				} else if (resource === 'mahnung') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getByCustomer') {
+						const filterKunde = this.getNodeParameter('mahnungFilterKunde', i) as Record<string, unknown>;
+						qs.kundennr = this.getNodeParameter('mahnungKundenNr', i) as string;
+						if (filterKunde.mahnstufe && (filterKunde.mahnstufe as number) > 0)
+							qs.mahnstufe = String(filterKunde.mahnstufe);
+						if (filterKunde.bezahlt === true) qs.bezahlt = 'true';
+						if (filterKunde.mahnsperre === true) qs.mahnsperre = 'true';
+						if (filterKunde.von) qs.von = filterKunde.von as string;
+						if (filterKunde.bis) qs.bis = filterKunde.bis as string;
+					} else if (operation === 'getByDateRange') {
+						const filter = this.getNodeParameter('mahnungFilter', i) as Record<string, unknown>;
+						qs.von = this.getNodeParameter('mahnungVon', i) as string;
+						qs.bis = this.getNodeParameter('mahnungBis', i) as string;
+						if (filter.mahnstufe && (filter.mahnstufe as number) > 0)
+							qs.mahnstufe = String(filter.mahnstufe);
+						if (filter.bezahlt === true) qs.bezahlt = 'true';
+						if (filter.mahnsperre === true) qs.mahnsperre = 'true';
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-dunning`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Rechnung ───────────────────────────────────────────────────────────
+				} else if (resource === 'rechnung') {
+					const qs: Record<string, string> = {};
+					if (operation === 'getById') {
+						qs.rechnungnr = this.getNodeParameter('rechnungNr', i) as string;
+					} else if (operation === 'getByCustomer') {
+						qs.kundennr = this.getNodeParameter('rechnungKundenNr', i) as string;
+					} else if (operation === 'getByDateRange') {
+						qs.von = this.getNodeParameter('rechnungVon', i) as string;
+						qs.bis = this.getNodeParameter('rechnungBis', i) as string;
+					}
+					responseData = await this.helpers.httpRequest({
+						method: 'GET',
+						url: `${baseUrl}/api/get-invoices`,
+						qs,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+
+				// ── Angebot ────────────────────────────────────────────────────────────
+				} else if (resource === 'offer') {
+					if (operation === 'create') {
+						const offerArtId = this.getNodeParameter('offerArtId', i) as number;
+						const offerArtNr = this.getNodeParameter('offerArtNr', i) as string;
+						const offerBody: Record<string, unknown> = {
+							customerid: this.getNodeParameter('offerCustId', i),
+							menge: this.getNodeParameter('amount', i),
+						};
+						if (offerArtId && offerArtId !== 0) {
+							offerBody.articleid = offerArtId;
+						} else if (offerArtNr) {
+							offerBody.artikelnr = offerArtNr;
+						}
+						responseData = await this.helpers.httpRequest({
+							method: 'POST',
+							url: `${baseUrl}/api/create-offer`,
+							body: offerBody,
+							headers,
+							json: true,
+							skipSslCertificateValidation: true,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.angebotsnr = this.getNodeParameter('angebotNr', i) as string;
+						} else if (operation === 'getByCustomer') {
+							qs.kundennr = this.getNodeParameter('offerKundenNr', i) as string;
+						} else if (operation === 'getByDateRange') {
+							qs.von = this.getNodeParameter('offerVon', i) as string;
+							qs.bis = this.getNodeParameter('offerBis', i) as string;
+						}
+						responseData = await this.helpers.httpRequest({
+							method: 'GET',
+							url: `${baseUrl}/api/get-offers`,
+							qs,
+							headers,
+							json: true,
+							skipSslCertificateValidation: true,
+						});
+					}
+
+				// ── Akquise ────────────────────────────────────────────────────────────
+				} else if (resource === 'akquise') {
+					const additionalFields = this.getNodeParameter('additionalFields', i) as Record<
+						string,
+						string
+					>;
+					const akquiseBody: Record<string, unknown> = {
+						email: this.getNodeParameter('email', i),
+						firma: this.getNodeParameter('company', i),
+					};
+					if (additionalFields.vorname) akquiseBody.vorname = additionalFields.vorname;
+					if (additionalFields.nachname) akquiseBody.nachname = additionalFields.nachname;
+					if (additionalFields.telefon) akquiseBody.telefon = additionalFields.telefon;
+					if (additionalFields.strasse) akquiseBody.strasse = additionalFields.strasse;
+					if (additionalFields.plz) akquiseBody.plz = additionalFields.plz;
+					if (additionalFields.ort) akquiseBody.ort = additionalFields.ort;
+					if (additionalFields.land) akquiseBody.land = additionalFields.land;
+					if (additionalFields.leadquelle) akquiseBody.leadquelle = additionalFields.leadquelle;
+					if (additionalFields.kampagneninfo)
+						akquiseBody.kampagneninfo = additionalFields.kampagneninfo;
+					if (additionalFields.perspectiveLeadId)
+						akquiseBody.perspectiveLeadId = additionalFields.perspectiveLeadId;
+
+					responseData = await this.helpers.httpRequest({
+						method: 'POST',
+						url: `${baseUrl}/api/akquise-create`,
+						body: akquiseBody,
+						headers,
+						json: true,
+						skipSslCertificateValidation: true,
+					});
+				}
+
+				const executionData = this.helpers.returnJsonArray(responseData);
+				returnData.push(...executionData.map((item) => ({ ...item, pairedItem: { item: i } })));
+			} catch (error) {
+				if (this.continueOnFail()) {
+					returnData.push({ json: { error: (error as Error).message } });
+					continue;
+				}
+				throw error;
+			}
+		}
+		return [returnData];
+	}
+}
