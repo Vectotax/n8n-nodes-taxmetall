@@ -1,15 +1,22 @@
 {
   "name": "@vectotaxsoftwaregmbh/n8n-nodes-taxmetall",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "description": "n8n community node for TaxMetall ERP — read customers, articles, orders, offers, invoices, delivery notes, purchase invoices, suppliers, dunning, and execute statistics queries via the TaxMetall REST API.",
   "license": "MIT",
   "homepage": "https://www.vectotax.de",
   "repository": {
     "type": "git",
-    "url": "https://github.com/Vectotax/n8n-nodes-taxmetall.git"
+    "url": "git+https://github.com/Vectotax/n8n-nodes-taxmetall.git"
   },
-  "bugs": { "url": "mailto:vectotax@vectotax.de" },
-  "keywords": ["n8n-community-node-package", "taxmetall", "erp", "vectotax"],
+  "bugs": {
+    "url": "mailto:vectotax@vectotax.de"
+  },
+  "keywords": [
+    "n8n-community-node-package",
+    "taxmetall",
+    "erp",
+    "vectotax"
+  ],
   "author": {
     "name": "Vectotax Software GmbH",
     "email": "vectotax@vectotax.de"
@@ -22,11 +29,15 @@
     "lint:fix": "n8n-node lint --fix",
     "release": "n8n-node release"
   },
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "n8n": {
     "n8nNodesApiVersion": 1,
     "strict": true,
-    "credentials": ["dist/credentials/TaxMetallApi.credentials.js"],
+    "credentials": [
+      "dist/credentials/TaxMetallApi.credentials.js"
+    ],
     "nodes": [
       "dist/nodes/TaxMetall/TaxMetall.node.js",
       "dist/nodes/TaxMetallStatistics/TaxMetallStatistics.node.js"
@@ -40,5 +51,7 @@
     "release-it": "^19.0.4",
     "typescript": "5.9.2"
   },
-  "peerDependencies": { "n8n-workflow": "*" }
+  "peerDependencies": {
+    "n8n-workflow": "*"
+  }
 }
