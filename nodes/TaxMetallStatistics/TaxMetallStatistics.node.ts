@@ -236,12 +236,17 @@ export class TaxMetallStatistics implements INodeType {
 			async getStatistics(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 				const credentials = await this.getCredentials('taxMetallApi');
 				const baseUrl = credentials.baseUrl as string;
+				const loadHeaders: Record<string, string> = {};
+				if (credentials.useNgrok === true) {
+					loadHeaders['ngrok-skip-browser-warning'] = 'true';
+				}
 
 				let response: StatisticsListResponse;
 				try {
 					response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/statistics/list`,
+						headers: loadHeaders,
 						json: true,
 						skipSslCertificateValidation: true,
 					});
@@ -272,9 +277,12 @@ export class TaxMetallStatistics implements INodeType {
 		const credentials = await this.getCredentials('taxMetallApi');
 		const baseUrl = credentials.baseUrl as string;
 
-		const headers = {
+		const headers: Record<string, string> = {
 			'Content-Type': 'application/json',
 		};
+		if (credentials.useNgrok === true) {
+			headers['ngrok-skip-browser-warning'] = 'true';
+		}
 
 		for (let i = 0; i < items.length; i++) {
 			try {

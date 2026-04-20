@@ -49,5 +49,12 @@ export class TaxMetallApi implements ICredentialType {
 			required: true,
 			description: 'The base URL of your TaxMetall instance',
 		},
+		{
+			displayName: 'Use ngrok Tunnel',
+			name: 'useNgrok',
+			type: 'boolean',
+			default: false,
+			description: 'Whether your TaxMetall instance is accessed via an ngrok tunnel. Enable this if you use ngrok instead of a custom domain.',
+		},
 	];
 }

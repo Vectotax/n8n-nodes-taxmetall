@@ -863,9 +863,12 @@ export class TaxMetall implements INodeType {
 				const operation = this.getNodeParameter('operation', i) as string;
 				let responseData;
 
-				const headers = {
+				const headers: Record<string, string> = {
 					'Content-Type': 'application/json',
 				};
+				if (credentials.useNgrok === true) {
+					headers['ngrok-skip-browser-warning'] = 'true';
+				}
 
 				const baseUrl = credentials.baseUrl as string;
 
