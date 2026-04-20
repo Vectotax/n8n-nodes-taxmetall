@@ -5,9 +5,10 @@ import {
 	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
+	NodeApiError,
 	NodeConnectionTypes,
-	NodeOperationError,
 } from 'n8n-workflow';
+import type { JsonObject } from 'n8n-workflow';
 
 interface StatisticEntry {
 	id: string;
@@ -241,9 +242,6 @@ export class TaxMetallStatistics implements INodeType {
 					response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'GET',
 						url: `${baseUrl}/api/statistics/list`,
-						headers: {
-							'ngrok-skip-browser-warning': 'true',
-						},
 						json: true,
 						skipSslCertificateValidation: true,
 					});
@@ -278,7 +276,6 @@ export class TaxMetallStatistics implements INodeType {
 		const baseUrl = credentials.baseUrl as string;
 
 		const headers = {
-			'ngrok-skip-browser-warning': 'true',
 			'Content-Type': 'application/json',
 		};
 
@@ -329,32 +326,14 @@ export class TaxMetallStatistics implements INodeType {
 					...executionData.map((item) => ({ ...item, pairedItem: { item: i } })),
 				);
 			} catch (error) {
-				// Try to extract the server response body (for 4xx/5xx errors)
-				type HttpError = { response?: { body?: unknown }; cause?: { response?: { body?: unknown } } };
-			const err = error as HttpError;
-			const responseBody = err?.response?.body ?? err?.cause?.response?.body;
-				let message: string;
-				if (responseBody) {
-					if (typeof responseBody === 'string') {
-						message = responseBody;
-					} else if (typeof responseBody === 'object' && responseBody !== null && 'message' in responseBody) {
-						message = String((responseBody as { message: unknown }).message);
-					} else if (typeof responseBody === 'object' && responseBody !== null && 'error' in responseBody) {
-						message = String((responseBody as { error: unknown }).error);
-					} else {
-						message = JSON.stringify(responseBody);
-					}
-				} else {
-					message = (error as Error).message ?? String(error);
-				}
 				if (this.continueOnFail()) {
 					returnData.push({
-						json: { error: message },
+						json: { error: (error as Error).message },
 						pairedItem: { item: i },
 					});
 					continue;
 				}
-				throw new NodeOperationError(this.getNode(), message);
+				throw new NodeApiError(this.getNode(), error as JsonObject);
 			}
 		}
 

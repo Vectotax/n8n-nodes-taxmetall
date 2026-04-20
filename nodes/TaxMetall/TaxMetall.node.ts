@@ -1,10 +1,27 @@
 import {
 	IExecuteFunctions,
+	ILoadOptionsFunctions,
 	INodeExecutionData,
+	INodePropertyOptions,
 	INodeType,
 	INodeTypeDescription,
+	NodeApiError,
 	NodeConnectionTypes,
 } from 'n8n-workflow';
+import type { JsonObject } from 'n8n-workflow';
+
+interface StatisticEntry {
+	id: string;
+	name: string;
+	type: string;
+	parameters: string[];
+}
+
+interface StatisticsListResponse {
+	success: boolean;
+	count: number;
+	statistics: StatisticEntry[];
+}
 
 export class TaxMetall implements INodeType {
 	description: INodeTypeDescription = {
@@ -27,6 +44,7 @@ export class TaxMetall implements INodeType {
 				lieferschein: 'Delivery Note',
 				mahnung: 'Dunning',
 				rechnung: 'Invoice',
+				statistics: 'Statistic',
 			}[$parameter["resource"]] ?? $parameter["resource"])
 			+ ' · ' +
 			({
@@ -71,6 +89,7 @@ export class TaxMetall implements INodeType {
 					{ name: 'Offer', value: 'offer' },
 					{ name: 'Order', value: 'auftrag' },
 					{ name: 'Purchase Invoice', value: 'eingangsrechnung' },
+					{ name: 'Statistic', value: 'statistics' },
 					{ name: 'Supplier', value: 'lieferant' },
 				],
 				default: 'article',
@@ -210,8 +229,26 @@ export class TaxMetall implements INodeType {
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['akquise'] } },
-				options: [{ name: 'Create', value: 'create', action: 'Create an acquisition' }],
+				options: [
+					{ name: 'Create', value: 'create', action: 'Create an acquisition' },
+					{ name: 'Search by ID', value: 'getById', action: 'Search by ID in acquisition' },
+					{ name: 'Search by Name', value: 'getByName', action: 'Search by name in acquisition' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in acquisition' },
+				],
 				default: 'create',
+				noDataExpression: true,
+			},
+
+			// Statistics
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['statistics'] } },
+				options: [
+					{ name: 'Execute', value: 'execute', action: 'Execute a statistics report' },
+				],
+				default: 'execute',
 				noDataExpression: true,
 			},
 
@@ -641,7 +678,7 @@ export class TaxMetall implements INodeType {
 				type: 'string',
 				placeholder: 'name@email.com',
 				required: true,
-				displayOptions: { show: { resource: ['akquise'] } },
+				displayOptions: { show: { resource: ['akquise'], operation: ['create'] } },
 				default: '',
 			},
 			{
@@ -649,7 +686,7 @@ export class TaxMetall implements INodeType {
 				name: 'company',
 				type: 'string',
 				required: true,
-				displayOptions: { show: { resource: ['akquise'] } },
+				displayOptions: { show: { resource: ['akquise'], operation: ['create'] } },
 				default: '',
 			},
 			{
@@ -658,7 +695,7 @@ export class TaxMetall implements INodeType {
 				type: 'collection',
 				placeholder: 'Add field',
 				default: {},
-				displayOptions: { show: { resource: ['akquise'] } },
+				displayOptions: { show: { resource: ['akquise'], operation: ['create'] } },
 				options: [
 					{ displayName: 'Campaign Info', name: 'kampagneninfo', type: 'string', default: '' },
 					{ displayName: 'City', name: 'ort', type: 'string', default: '' },
@@ -677,8 +714,142 @@ export class TaxMetall implements INodeType {
 					{ displayName: 'Street', name: 'strasse', type: 'string', default: '' },
 				],
 			},
+			{
+				displayName: 'Acquisition ID',
+				name: 'akquiseId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['akquise'], operation: ['getById'] } },
+				default: '',
+				description: 'Internal acquisition contact number (KontaktNr)',
+			},
+			{
+				displayName: 'Name',
+				name: 'akquiseName',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['akquise'], operation: ['getByName'] } },
+				default: '',
+				description: 'Search by partial match on company or contact name',
+			},
+			{
+				displayName: 'Date From',
+				name: 'akquiseVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['akquise'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Start date (first contact date) in format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Date To',
+				name: 'akquiseBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['akquise'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'End date (first contact date) in format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+			// ─── PARAMETERS: Statistics ───────────────────────────────────────────────
+			{
+				displayName: 'Statistics / Report Name or ID',
+				name: 'statisticId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getStatistics' },
+				default: '',
+				required: true,
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Select the report to execute. The option description shows which parameters it requires. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				displayName: 'Date From',
+				name: 'statDatumVon',
+				type: 'dateTime',
+				default: '',
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Start date of the reporting period (SQL parameter: DatumVon)',
+			},
+			{
+				displayName: 'Date To',
+				name: 'statDatumBis',
+				type: 'dateTime',
+				default: '',
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'End date of the reporting period (SQL parameter: DatumBis)',
+			},
+			{
+				displayName: 'Comparison From',
+				name: 'statVergleichVon',
+				type: 'dateTime',
+				default: '',
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Start date of a comparison period (SQL parameter: VergleichVon)',
+			},
+			{
+				displayName: 'Comparison To',
+				name: 'statVergleichBis',
+				type: 'dateTime',
+				default: '',
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'End date of a comparison period (SQL parameter: VergleichBis)',
+			},
+			{
+				displayName: 'Additional Parameters',
+				name: 'statWeitereParameter',
+				type: 'collection',
+				placeholder: 'Add parameter',
+				default: {},
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Optional filter parameters — which ones are required is shown in the report description above',
+				options: [
+					{ displayName: 'Article Group', name: 'ArtikelGruppe', type: 'string', default: '', description: 'SQL parameter: ArtikelGruppe' },
+					{ displayName: 'Article No.', name: 'Artikel', type: 'string', default: '', description: 'SQL parameter: Artikel' },
+					{ displayName: 'Business Area', name: 'GeschBereich', type: 'string', default: '', description: 'SQL parameter: GeschBereich' },
+					{ displayName: 'Customer No.', name: 'Kunden', type: 'string', default: '', description: 'SQL parameter: Kunden' },
+					{ displayName: 'Employee', name: 'Mitarbeiter', type: 'string', default: '', description: 'SQL parameter: Mitarbeiter' },
+					{ displayName: 'Offer No.', name: 'Angebot', type: 'string', default: '', description: 'SQL parameter: Angebot' },
+					{ displayName: 'Offer Position', name: 'AngebotsPos', type: 'string', default: '', description: 'SQL parameter: AngebotsPos' },
+					{ displayName: 'Order No.', name: 'Auftrag', type: 'string', default: '', description: 'SQL parameter: Auftrag' },
+					{ displayName: 'Order Position', name: 'AuftragsPos', type: 'string', default: '', description: 'SQL parameter: AuftragsPos' },
+					{ displayName: 'Order Type', name: 'AuftragsArt', type: 'string', default: '', description: 'SQL parameter: AuftragsArt' },
+					{ displayName: 'Project No.', name: 'Projekt', type: 'string', default: '', description: 'SQL parameter: Projekt' },
+					{ displayName: 'Purchase Order No.', name: 'Bestellung', type: 'string', default: '', description: 'SQL parameter: Bestellung' },
+					{ displayName: 'Purchase Order Position', name: 'BestellPos', type: 'string', default: '', description: 'SQL parameter: BestellPos' },
+					{ displayName: 'Supplier No.', name: 'Lieferanten', type: 'string', default: '', description: 'SQL parameter: Lieferanten' },
+					{ displayName: 'Value Range From', name: 'WertebereichVon', type: 'number', default: 0, description: 'SQL parameter: WertebereichVon' },
+					{ displayName: 'Value Range To', name: 'WertebereichBis', type: 'number', default: 0, description: 'SQL parameter: WertebereichBis' },
+					{ displayName: 'Variable 1', name: 'Variable1', type: 'string', default: '', description: 'SQL parameter: Variable1' },
+					{ displayName: 'Warehouse', name: 'Lagerort', type: 'string', default: '', description: 'SQL parameter: Lagerort' },
+				],
+			},
 		],
 		usableAsTool: true,
+	};
+
+	methods = {
+		loadOptions: {
+			async getStatistics(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('taxMetallApi');
+				const baseUrl = credentials.baseUrl as string;
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+					method: 'GET',
+					url: `${baseUrl}/api/statistics/list`,
+					json: true,
+					skipSslCertificateValidation: true,
+				}) as StatisticsListResponse;
+				if (!response.success || !Array.isArray(response.statistics)) return [];
+				return response.statistics.map((stat) => ({
+					name: stat.name,
+					value: stat.id,
+					description: stat.parameters.length > 0
+						? `Required parameters: ${stat.parameters.join(', ')}`
+						: 'No parameters required',
+				}));
+			},
+		},
 	};
 
 	async execute(this: IExecuteFunctions): Promise<INodeExecutionData[][]> {
@@ -693,7 +864,6 @@ export class TaxMetall implements INodeType {
 				let responseData;
 
 				const headers = {
-					'ngrok-skip-browser-warning': 'true',
 					'Content-Type': 'application/json',
 				};
 
@@ -910,47 +1080,98 @@ export class TaxMetall implements INodeType {
 						});
 					}
 
-				// ── Acquisition ────────────────────────────────────────────────────────
-				} else if (resource === 'akquise') {
-					const additionalFields = this.getNodeParameter('additionalFields', i) as Record<
-						string,
-						string
-					>;
-					const akquiseBody: Record<string, unknown> = {
-						email: this.getNodeParameter('email', i),
-						firma: this.getNodeParameter('company', i),
-					};
-					if (additionalFields.vorname) akquiseBody.vorname = additionalFields.vorname;
-					if (additionalFields.nachname) akquiseBody.nachname = additionalFields.nachname;
-					if (additionalFields.telefon) akquiseBody.telefon = additionalFields.telefon;
-					if (additionalFields.strasse) akquiseBody.strasse = additionalFields.strasse;
-					if (additionalFields.plz) akquiseBody.plz = additionalFields.plz;
-					if (additionalFields.ort) akquiseBody.ort = additionalFields.ort;
-					if (additionalFields.land) akquiseBody.land = additionalFields.land;
-					if (additionalFields.leadquelle) akquiseBody.leadquelle = additionalFields.leadquelle;
-					if (additionalFields.kampagneninfo)
-						akquiseBody.kampagneninfo = additionalFields.kampagneninfo;
-					if (additionalFields.perspectiveLeadId)
-						akquiseBody.perspectiveLeadId = additionalFields.perspectiveLeadId;
+				// ── Statistics ────────────────────────────────────────────────────────
+				} else if (resource === 'statistics') {
+					const statisticId = this.getNodeParameter('statisticId', i) as string;
+					const parameters: Record<string, string | number> = {};
+
+					const datumVon = this.getNodeParameter('statDatumVon', i) as string;
+					if (datumVon) parameters['DatumVon'] = datumVon.substring(0, 10);
+					const datumBis = this.getNodeParameter('statDatumBis', i) as string;
+					if (datumBis) parameters['DatumBis'] = datumBis.substring(0, 10);
+					const vergleichVon = this.getNodeParameter('statVergleichVon', i) as string;
+					if (vergleichVon) parameters['VergleichVon'] = vergleichVon.substring(0, 10);
+					const vergleichBis = this.getNodeParameter('statVergleichBis', i) as string;
+					if (vergleichBis) parameters['VergleichBis'] = vergleichBis.substring(0, 10);
+
+					const weitereParameter = this.getNodeParameter('statWeitereParameter', i) as Record<string, string | number>;
+					for (const [key, value] of Object.entries(weitereParameter)) {
+						if (value === '' || value === null || value === undefined) continue;
+						if (typeof value === 'number' && value === 0) continue;
+						parameters[key] = value;
+					}
 
 					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 						method: 'POST',
-						url: `${baseUrl}/api/akquise-create`,
-						body: akquiseBody,
+						url: `${baseUrl}/api/statistics/execute`,
+						body: { statisticId, parameters },
 						headers,
 						json: true,
 						skipSslCertificateValidation: true,
+						timeout: 120000,
 					});
+
+				// ── Acquisition ────────────────────────────────────────────────────────
+				} else if (resource === 'akquise') {
+					if (operation === 'create') {
+						const additionalFields = this.getNodeParameter('additionalFields', i) as Record<
+							string,
+							string
+						>;
+						const akquiseBody: Record<string, unknown> = {
+							email: this.getNodeParameter('email', i),
+							firma: this.getNodeParameter('company', i),
+						};
+						if (additionalFields.vorname) akquiseBody.vorname = additionalFields.vorname;
+						if (additionalFields.nachname) akquiseBody.nachname = additionalFields.nachname;
+						if (additionalFields.telefon) akquiseBody.telefon = additionalFields.telefon;
+						if (additionalFields.strasse) akquiseBody.strasse = additionalFields.strasse;
+						if (additionalFields.plz) akquiseBody.plz = additionalFields.plz;
+						if (additionalFields.ort) akquiseBody.ort = additionalFields.ort;
+						if (additionalFields.land) akquiseBody.land = additionalFields.land;
+						if (additionalFields.leadquelle) akquiseBody.leadquelle = additionalFields.leadquelle;
+						if (additionalFields.kampagneninfo)
+							akquiseBody.kampagneninfo = additionalFields.kampagneninfo;
+						if (additionalFields.perspectiveLeadId)
+							akquiseBody.perspectiveLeadId = additionalFields.perspectiveLeadId;
+
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/akquise-create`,
+							body: akquiseBody,
+							headers,
+							json: true,
+							skipSslCertificateValidation: true,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.kontaktnr = this.getNodeParameter('akquiseId', i) as string;
+						} else if (operation === 'getByName') {
+							qs.name = this.getNodeParameter('akquiseName', i) as string;
+						} else if (operation === 'getByDateRange') {
+							qs.von = this.getNodeParameter('akquiseVon', i) as string;
+							qs.bis = this.getNodeParameter('akquiseBis', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-akquise`,
+							qs,
+							headers,
+							json: true,
+							skipSslCertificateValidation: true,
+						});
+					}
 				}
 
 				const executionData = this.helpers.returnJsonArray(responseData);
 				returnData.push(...executionData.map((item) => ({ ...item, pairedItem: { item: i } })));
 			} catch (error) {
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: (error as Error).message } });
+					returnData.push({ json: { error: (error as Error).message }, pairedItem: { item: i } });
 					continue;
 				}
-				throw error;
+				throw new NodeApiError(this.getNode(), error as JsonObject);
 			}
 		}
 		return [returnData];
