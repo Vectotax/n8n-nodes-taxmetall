@@ -246,10 +246,7 @@ export class TaxMetallStatistics implements INodeType {
 						skipSslCertificateValidation: true,
 					});
 				} catch (error) {
-					throw new NodeOperationError(
-						this.getNode(),
-						`Failed to load statistics list: ${(error as Error).message}`,
-					);
+					throw new NodeApiError(this.getNode(), error as JsonObject);
 				}
 
 				if (!response.success || !Array.isArray(response.statistics)) {
