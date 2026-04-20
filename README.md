@@ -15,7 +15,6 @@ An [n8n](https://n8n.io/) community node package that integrates **TaxMetall ERP
 - [Credentials](#credentials)
 - [Nodes](#nodes)
   - [TaxMetall](#taxmetall)
-  - [TaxMetall Statistics](#taxmetall-statistics)
 - [Compatibility](#compatibility)
 - [Resources](#resources)
 - [License](#license)
@@ -47,8 +46,11 @@ Create a **TaxMetall API** credential in n8n (**Settings → Credentials → New
 |---|---|---|
 | **Base URL** | URL of your TaxMetall API service | `https://api.example.com:8443` |
 | **API Key** | The `tax-api-key` configured in your TaxMetall API service | `your-secret-api-key` |
+| **Use ngrok Tunnel** | Enable if your TaxMetall instance is accessed via an ngrok tunnel (default: off) | — |
 
 The API key is sent as the `tax-api-key` HTTP header with every request.
+
+> **ngrok users:** If your TaxMetall API service is exposed via ngrok and you do not have a custom domain, enable the **Use ngrok Tunnel** toggle in the credentials. This adds the `ngrok-skip-browser-warning` header to all requests, which is required to bypass the ngrok interstitial page.
 
 ---
 
@@ -134,62 +136,56 @@ General-purpose ERP node for querying and creating records across all TaxMetall 
 
 > **Note:** Dunning records are not independent documents in TaxMetall. They are a filtered view of the invoice table (open balance > 0, not a credit note, no dunning block).
 
-##### Akquise
+##### Acquisition (Akquise)
 
 | Operation | Description | Required Parameters |
 |---|---|---|
 | Create | Create a new acquisition/lead entry | Company name, email address |
+| Search by ID | Retrieve an acquisition entry by internal ID | Acquisition ID |
+| Search by name | Find acquisition entries by company or contact name | Name |
+| Search by date range | List acquisition entries by first contact date | Date from, Date to |
 
----
+##### Statistic
 
-### TaxMetall Statistics
+Executes pre-configured SQL reports stored in TaxMetall and returns the results as a JSON array. This allows every custom report and Business Cockpit report defined in your TaxMetall installation to be used directly inside n8n workflows.
 
-Executes pre-configured SQL reports stored in TaxMetall and returns the results as a JSON array. This allows every custom report and business cockpit report defined in your TaxMetall installation to be used directly inside n8n workflows.
+The node dynamically loads all available reports for the authenticated tenant and presents them in a dropdown. Each option shows the report name and the parameters it requires.
 
-#### How it works
+| Operation | Description |
+|---|---|
+| Execute | Run a report and return the results as a JSON array |
 
-The node dynamically loads all available reports for the authenticated tenant from the database and presents them in a dropdown. Each option shows the report name and which parameters it expects.
-
-#### Fields
+**Fields**
 
 | Field | Type | Description |
 |---|---|---|
-| **Statistic / Report** | Dropdown | Select the report to execute. The option description lists the expected parameters. |
-| **Date from** | Date | Start of the reporting period (SQL parameter: `DatumVon`) |
-| **Date to** | Date | End of the reporting period (SQL parameter: `DatumBis`) |
-| **Additional parameters** | Collection | Optional filter parameters depending on the report |
+| **Statistic / Report** | Dropdown | Select the report to execute — the description lists expected parameters |
+| **Date From** | Date | Start of the reporting period (SQL parameter: `DatumVon`) |
+| **Date To** | Date | End of the reporting period (SQL parameter: `DatumBis`) |
+| **Comparison From** | Date | Start of an optional comparison period (SQL parameter: `VergleichVon`) |
+| **Comparison To** | Date | End of an optional comparison period (SQL parameter: `VergleichBis`) |
+| **Additional Parameters** | Collection | Optional filter parameters depending on the report |
 
-#### Additional parameters
+**Additional parameters**
 
 | Field | SQL Name | Description |
 |---|---|---|
-| Article number | `Artikel` | Filter by article number |
-| Order type | `AuftragsArt` | Filter by order type code |
-| Business area | `GeschBereich` | Filter by business area |
-| Customer number | `Kunden` | Filter by customer number |
+| Article No. | `Artikel` | Filter by article number |
+| Article Group | `ArtikelGruppe` | Filter by article group |
+| Order No. | `Auftrag` | Filter by order number |
+| Order Type | `AuftragsArt` | Filter by order type code |
+| Business Area | `GeschBereich` | Filter by business area |
+| Customer No. | `Kunden` | Filter by customer number |
 | Warehouse | `Lagerort` | Filter by warehouse code |
-| Supplier number | `Lieferanten` | Filter by supplier number |
+| Supplier No. | `Lieferanten` | Filter by supplier number |
 | Employee | `Mitarbeiter` | Filter by employee code |
-| Project | `Projekt` | Filter by project ID |
-| Value range from | `WertebereichVon` | Numeric start value for range filters |
-| Value range to | `WertebereichBis` | Numeric end value for range filters |
+| Project No. | `Projekt` | Filter by project ID |
+| Purchase Order No. | `Bestellung` | Filter by purchase order number |
+| Value Range From | `WertebereichVon` | Numeric start value for range filters |
+| Value Range To | `WertebereichBis` | Numeric end value for range filters |
+| Variable 1 | `Variable1` | Free text value |
 
-#### Example response
-
-```json
-{
-  "success": true,
-  "statisticId": "SQLButton3",
-  "statisticName": "Revenue by Customer",
-  "rowCount": 42,
-  "data": [
-    { "CustomerNo": "1001", "Revenue": 15000.00 },
-    { "CustomerNo": "1002", "Revenue": 8750.50 }
-  ]
-}
-```
-
-#### Supported report types
+**Supported report types**
 
 | Type | Available | Description |
 |---|---|---|
