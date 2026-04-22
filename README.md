@@ -47,10 +47,13 @@ Create a **TaxMetall API** credential in n8n (**Settings → Credentials → New
 | **Base URL** | URL of your TaxMetall API service | `https://api.example.com:8443` |
 | **API Key** | The `tax-api-key` configured in your TaxMetall API service | `your-secret-api-key` |
 | **Use ngrok Tunnel** | Enable if your TaxMetall instance is accessed via an ngrok tunnel (default: off) | — |
+| **Allow Self-Signed Certificates** | Disable TLS certificate validation — enable only for on-premises installations using self-signed certificates (default: off) | — |
 
 The API key is sent as the `tax-api-key` HTTP header with every request.
 
 > **ngrok users:** If your TaxMetall API service is exposed via ngrok and you do not have a custom domain, enable the **Use ngrok Tunnel** toggle in the credentials. This adds the `ngrok-skip-browser-warning` header to all requests, which is required to bypass the ngrok interstitial page.
+
+> **Self-signed certificates:** If your TaxMetall API service runs on-premises with a self-signed TLS certificate, enable **Allow Self-Signed Certificates**. Leave this off in all other cases — disabling certificate validation on untrusted networks exposes your API key to interception.
 
 ---
 
