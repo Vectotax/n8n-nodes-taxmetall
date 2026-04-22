@@ -1,0 +1,272 @@
+{
+  "nodeType": {
+    "taxMetall": {
+      "description": {
+        "displayName": "TaxMetall",
+        "description": "n8n-Integration zur Anbindung und Automatisierung von Prozessen im TaxMetall SQL Edition ERP-System (Vectotax Software GmbH)"
+      },
+      "properties": {
+        "resource": {
+          "displayName": "Ressource",
+          "options": {
+            "akquise": { "displayName": "Akquise" },
+            "article": { "displayName": "Artikel" },
+            "customer": { "displayName": "Kunde" },
+            "lieferschein": { "displayName": "Lieferschein" },
+            "mahnung": { "displayName": "Mahnung" },
+            "rechnung": { "displayName": "Rechnung" },
+            "offer": { "displayName": "Angebot" },
+            "auftrag": { "displayName": "Auftrag" },
+            "eingangsrechnung": { "displayName": "Eingangsrechnung" },
+            "lieferant": { "displayName": "Lieferant" }
+          }
+        },
+        "operation": {
+          "displayName": "Operation",
+          "options": {
+            "create": {
+              "displayName": "Erstellen",
+              "action": "Erstellen"
+            },
+            "getById": {
+              "displayName": "Nach ID suchen",
+              "action": "Nach ID suchen"
+            },
+            "getByName": {
+              "displayName": "Nach Name suchen",
+              "action": "Nach Name suchen"
+            },
+            "getByArticleNumber": {
+              "displayName": "Nach Artikelnummer suchen",
+              "action": "Nach Artikelnummer suchen"
+            },
+            "getByDrawingNumber": {
+              "displayName": "Nach Zeichnungsnummer suchen",
+              "action": "Nach Zeichnungsnummer suchen"
+            },
+            "getByOrderId": {
+              "displayName": "Nach Auftragsnummer suchen",
+              "action": "Nach Auftragsnummer suchen"
+            },
+            "getByCustomer": {
+              "displayName": "Nach Kundennummer suchen",
+              "action": "Nach Kundennummer suchen"
+            },
+            "getByArticle": {
+              "displayName": "Nach Artikel suchen",
+              "action": "Nach Artikel suchen"
+            },
+            "getBySupplier": {
+              "displayName": "Nach Lieferant suchen",
+              "action": "Nach Lieferant suchen"
+            },
+            "getByDateRange": {
+              "displayName": "Nach Datumsbereich suchen",
+              "action": "Nach Datumsbereich suchen"
+            },
+            "getStatus": {
+              "displayName": "Status abrufen",
+              "action": "Status abrufen"
+            }
+          }
+        },
+        "articleId": {
+          "displayName": "Artikel-ID"
+        },
+        "articleNumber": {
+          "displayName": "Artikelnummer"
+        },
+        "articleName": {
+          "displayName": "Name"
+        },
+        "drawingNumber": {
+          "displayName": "Zeichnungsnummer"
+        },
+        "auftragsNr": {
+          "displayName": "Auftragsnummer",
+          "description": "Interne Auftragsnummer (Auftragnr)"
+        },
+        "auftragVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum im Format JJJJ-MM-TT"
+        },
+        "auftragBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum im Format JJJJ-MM-TT"
+        },
+        "erNr": {
+          "displayName": "Eingangsrechnungsnummer",
+          "description": "Eingangsrechnungsnummer (ERNr)"
+        },
+        "erLieferNr": {
+          "displayName": "Lieferantennummer (Optional)",
+          "description": "Lieferantennummer zur Eingrenzung der Ergebnisse, wenn mehrere Einträge dieselbe Eingangsrechnungsnummer haben"
+        },
+        "erLieferantNr": {
+          "displayName": "Lieferantennummer"
+        },
+        "erVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum (Rechnungsdatum) im Format JJJJ-MM-TT"
+        },
+        "erBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum (Rechnungsdatum) im Format JJJJ-MM-TT"
+        },
+        "customerName": {
+          "displayName": "Kundenname"
+        },
+        "customerId": {
+          "displayName": "Kunden-ID"
+        },
+        "orderId": {
+          "displayName": "Auftrags-ID"
+        },
+        "lieferantId": {
+          "displayName": "Lieferantennummer"
+        },
+        "lieferantName": {
+          "displayName": "Name",
+          "description": "Suche nach Teilübereinstimmung im Lieferantennamen"
+        },
+        "lieferantArtikelNr": {
+          "displayName": "Artikelnummer",
+          "description": "Artikelnummer aus der Lieferanten-Artikel-Zuordnungstabelle"
+        },
+        "lieferscheinNr": {
+          "displayName": "Lieferscheinnummer"
+        },
+        "lieferscheinKundenNr": {
+          "displayName": "Kundennummer"
+        },
+        "lieferscheinVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum im Format JJJJ-MM-TT"
+        },
+        "lieferscheinBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum im Format JJJJ-MM-TT"
+        },
+        "mahnungKundenNr": {
+          "displayName": "Kundennummer"
+        },
+        "mahnungFilterKunde": {
+          "displayName": "Optionale Filter",
+          "placeholder": "Filter hinzufügen",
+          "options": {
+            "von": {
+              "displayName": "Fälligkeit von",
+              "description": "Optionaler Datumsfilter: Startdatum (Fälligkeitsdatum) im Format JJJJ-MM-TT"
+            },
+            "bis": {
+              "displayName": "Fälligkeit bis",
+              "description": "Optionaler Datumsfilter: Enddatum (Fälligkeitsdatum) im Format JJJJ-MM-TT"
+            },
+            "mahnstufe": {
+              "displayName": "Mahnstufe",
+              "description": "Nur Einträge dieser Mahnstufe anzeigen (0 = alle)"
+            },
+            "mahnsperre": {
+              "displayName": "Gesperrte einschließen",
+              "description": "Ob Einträge mit Mahnsperre eingeschlossen werden sollen"
+            },
+            "bezahlt": {
+              "displayName": "Bezahlte einschließen",
+              "description": "Ob bezahlte Einträge eingeschlossen werden sollen (NotPayed = 0)"
+            }
+          }
+        },
+        "mahnungVon": {
+          "displayName": "Fälligkeit von",
+          "description": "Startdatum (Fälligkeitsdatum) im Format JJJJ-MM-TT"
+        },
+        "mahnungBis": {
+          "displayName": "Fälligkeit bis",
+          "description": "Enddatum (Fälligkeitsdatum) im Format JJJJ-MM-TT"
+        },
+        "mahnungFilter": {
+          "displayName": "Optionale Filter",
+          "placeholder": "Filter hinzufügen",
+          "options": {
+            "mahnstufe": {
+              "displayName": "Mahnstufe",
+              "description": "Nur Einträge dieser Mahnstufe anzeigen (0 = alle)"
+            },
+            "mahnsperre": {
+              "displayName": "Gesperrte einschließen",
+              "description": "Ob Einträge mit Mahnsperre eingeschlossen werden sollen"
+            },
+            "bezahlt": {
+              "displayName": "Bezahlte einschließen",
+              "description": "Ob bezahlte Einträge eingeschlossen werden sollen (NotPayed = 0)"
+            }
+          }
+        },
+        "rechnungNr": {
+          "displayName": "Rechnungsnummer"
+        },
+        "rechnungKundenNr": {
+          "displayName": "Kundennummer"
+        },
+        "rechnungVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum (Rechnungsdatum) im Format JJJJ-MM-TT"
+        },
+        "rechnungBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum (Rechnungsdatum) im Format JJJJ-MM-TT"
+        },
+        "offerCustId": {
+          "displayName": "Kunden-ID"
+        },
+        "offerArtId": {
+          "displayName": "Artikel-ID",
+          "description": "Numerische Artikel-ID (articleid). Alternativ eine Artikelnummer im Feld unten angeben."
+        },
+        "offerArtNr": {
+          "displayName": "Artikelnummer",
+          "description": "Artikelnummer als Text (artikelnr). Wird verwendet, wenn Artikel-ID = 0."
+        },
+        "amount": {
+          "displayName": "Menge"
+        },
+        "angebotNr": {
+          "displayName": "Angebotsnummer"
+        },
+        "offerKundenNr": {
+          "displayName": "Kundennummer"
+        },
+        "offerVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum (Angebotsdatum) im Format JJJJ-MM-TT"
+        },
+        "offerBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum (Angebotsdatum) im Format JJJJ-MM-TT"
+        },
+        "email": {
+          "displayName": "E-Mail"
+        },
+        "company": {
+          "displayName": "Unternehmen"
+        },
+        "additionalFields": {
+          "displayName": "Weitere Felder",
+          "placeholder": "Feld hinzufügen",
+          "options": {
+            "kampagneninfo": { "displayName": "Kampagneninfo" },
+            "ort": { "displayName": "Ort" },
+            "land": { "displayName": "Land" },
+            "vorname": { "displayName": "Vorname" },
+            "nachname": { "displayName": "Nachname" },
+            "leadquelle": { "displayName": "Lead-Quelle" },
+            "perspectiveLeadId": { "displayName": "Perspective Lead-ID" },
+            "telefon": { "displayName": "Telefon" },
+            "plz": { "displayName": "Postleitzahl" },
+            "strasse": { "displayName": "Straße" }
+          }
+        }
+      }
+    }
+  }
+}

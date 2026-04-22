@@ -834,11 +834,14 @@ export class TaxMetall implements INodeType {
 			async getStatistics(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 				const credentials = await this.getCredentials('taxMetallApi');
 				const baseUrl = credentials.baseUrl as string;
+				const loadTlsOption = credentials.allowSelfSignedCertificates === true
+					? { skipSslCertificateValidation: true as const }
+					: {};
 				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 					method: 'GET',
 					url: `${baseUrl}/api/statistics/list`,
 					json: true,
-					skipSslCertificateValidation: true,
+					...loadTlsOption,
 				}) as StatisticsListResponse;
 				if (!response.success || !Array.isArray(response.statistics)) return [];
 				return response.statistics.map((stat) => ({
@@ -871,6 +874,9 @@ export class TaxMetall implements INodeType {
 				}
 
 				const baseUrl = credentials.baseUrl as string;
+				const tlsOption = credentials.allowSelfSignedCertificates === true
+					? { skipSslCertificateValidation: true as const }
+					: {};
 
 				// ── Article ────────────────────────────────────────────────────────────
 				if (resource === 'article') {
@@ -890,7 +896,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Order ──────────────────────────────────────────────────────────────
@@ -908,7 +914,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Purchase Invoice ───────────────────────────────────────────────────
@@ -930,7 +936,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Customer ───────────────────────────────────────────────────────────
@@ -949,7 +955,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Supplier ───────────────────────────────────────────────────────────
@@ -968,7 +974,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Delivery Note ──────────────────────────────────────────────────────
@@ -988,7 +994,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Dunning ────────────────────────────────────────────────────────────
@@ -1018,7 +1024,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Invoice ────────────────────────────────────────────────────────────
@@ -1038,7 +1044,7 @@ export class TaxMetall implements INodeType {
 						qs,
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 					});
 
 				// ── Offer ──────────────────────────────────────────────────────────────
@@ -1061,7 +1067,7 @@ export class TaxMetall implements INodeType {
 							body: offerBody,
 							headers,
 							json: true,
-							skipSslCertificateValidation: true,
+							...tlsOption,
 						});
 					} else {
 						const qs: Record<string, string> = {};
@@ -1079,7 +1085,7 @@ export class TaxMetall implements INodeType {
 							qs,
 							headers,
 							json: true,
-							skipSslCertificateValidation: true,
+							...tlsOption,
 						});
 					}
 
@@ -1110,7 +1116,7 @@ export class TaxMetall implements INodeType {
 						body: { statisticId, parameters },
 						headers,
 						json: true,
-						skipSslCertificateValidation: true,
+						...tlsOption,
 						timeout: 120000,
 					});
 
@@ -1144,7 +1150,7 @@ export class TaxMetall implements INodeType {
 							body: akquiseBody,
 							headers,
 							json: true,
-							skipSslCertificateValidation: true,
+							...tlsOption,
 						});
 					} else {
 						const qs: Record<string, string> = {};
@@ -1162,7 +1168,7 @@ export class TaxMetall implements INodeType {
 							qs,
 							headers,
 							json: true,
-							skipSslCertificateValidation: true,
+							...tlsOption,
 						});
 					}
 				}

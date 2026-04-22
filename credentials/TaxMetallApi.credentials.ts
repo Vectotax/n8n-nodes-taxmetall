@@ -27,7 +27,7 @@ export class TaxMetallApi implements ICredentialType {
 			headers: {
 				'tax-api-key': '={{$credentials.apiKey}}',
 			},
-			skipSslCertificateValidation: true,
+			skipSslCertificateValidation: '={{$credentials.allowSelfSignedCertificates}}',
 		},
 	};
 
@@ -55,6 +55,14 @@ export class TaxMetallApi implements ICredentialType {
 			type: 'boolean',
 			default: false,
 			description: 'Whether your TaxMetall instance is accessed via an ngrok tunnel. Enable this if you use ngrok instead of a custom domain.',
+		},
+		// eslint-disable-next-line @n8n/community-nodes/credential-password-field
+		{
+			displayName: 'Allow Self-Signed Certificates',
+			name: 'allowSelfSignedCertificates',
+			type: 'boolean',
+			default: false,
+			description: 'Whether to disable TLS certificate validation — enable only for on-premises installations using self-signed certificates',
 		},
 	];
 }
