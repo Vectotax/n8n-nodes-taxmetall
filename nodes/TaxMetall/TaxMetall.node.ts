@@ -32,6 +32,13 @@ export class TaxMetall implements INodeType {
 		version: 1,
 		description:
 			'n8n integration for connecting and automating processes in the TaxMetall SQL Edition ERP system (Vectotax Software GmbH)',
+		codex: {
+			categories: ['Sales'],
+			alias: ['ERP', 'Vectotax', 'invoice', 'order management', 'warehouse', 'supplier', 'customer'],
+			subcategories: {
+				Sales: ['CRM', 'Other Trigger Nodes'],
+			},
+		},
 		subtitle: `={{
 			({
 				akquise: 'Acquisition',
