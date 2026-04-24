@@ -2,10 +2,10 @@
   "node": "n8n-nodes-taxmetall.taxMetall",
   "nodeVersion": "1.0",
   "codexVersion": "1.0",
-  "categories": ["Data & Storage"],
+  "categories": ["Finance & Accounting", "Sales"],
   "resources": {
     "credentialDocumentation": [],
     "primaryDocumentation": []
   },
-  "alias": ["TaxMetall", "ERP", "Vectotax", "invoice", "order", "customer"]
+  "alias": ["TaxMetall", "ERP", "Vectotax", "invoice", "order", "order management", "customer", "warehouse", "supplier"]
 }
