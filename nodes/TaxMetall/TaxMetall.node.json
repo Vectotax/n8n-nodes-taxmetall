@@ -7,5 +7,5 @@
     "credentialDocumentation": [],
     "primaryDocumentation": []
   },
-  "alias": ["TaxMetall", "ERP", "Vectotax", "invoice", "order", "order management", "customer", "warehouse", "supplier"]
+  "alias": ["TaxMetall", "TaxMetall ERP", "ERP", "Vectotax", "invoice", "order", "order management", "customer", "warehouse", "supplier"]
 }

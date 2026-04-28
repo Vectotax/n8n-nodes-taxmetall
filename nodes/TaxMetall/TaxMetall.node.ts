@@ -25,7 +25,7 @@ interface StatisticsListResponse {
 
 export class TaxMetall implements INodeType {
 	description: INodeTypeDescription = {
-		displayName: 'TaxMetall',
+		displayName: 'TaxMetall ERP',
 		name: 'taxMetall',
 		icon: 'file:TaxMetallLogo.svg',
 		group: ['transform'],
@@ -62,7 +62,7 @@ export class TaxMetall implements INodeType {
 			}[$parameter["operation"]] ?? $parameter["operation"])
 		}}`,
 		defaults: {
-			name: 'TaxMetall',
+			name: 'TaxMetall ERP',
 		},
 		inputs: [NodeConnectionTypes.Main],
 		outputs: [NodeConnectionTypes.Main],
