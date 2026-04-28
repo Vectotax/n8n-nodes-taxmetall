@@ -9,7 +9,7 @@ export class TaxMetallApi implements ICredentialType {
 	name = 'taxMetallApi';
 	displayName = 'TaxMetall API';
 	documentationUrl = 'https://www.vectotax.de';
-	icon = 'file:VectotaxLogo.svg' as const;
+	icon = 'file:TaxMetallLogo.svg' as const;
 
 	authenticate: IAuthenticateGeneric = {
 		type: 'generic',

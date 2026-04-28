@@ -27,7 +27,7 @@ export class TaxMetall implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'TaxMetall',
 		name: 'taxMetall',
-		icon: 'file:VectotaxLogo.svg',
+		icon: 'file:TaxMetallLogo.svg',
 		group: ['transform'],
 		version: 1,
 		description:
@@ -104,6 +104,7 @@ export class TaxMetall implements INodeType {
 				type: 'options',
 				displayOptions: { show: { resource: ['article'] } },
 				options: [
+					{ name: 'Create', value: 'create', action: 'Create an article' },
 					{ name: 'Search by Article ID', value: 'getById', action: 'Search by article ID in article' },
 					{ name: 'Search by Article Number', value: 'getByArticleNumber', action: 'Search by article number in article' },
 					{ name: 'Search by Drawing Number', value: 'getByDrawingNumber', action: 'Search by drawing number in article' },
@@ -146,6 +147,7 @@ export class TaxMetall implements INodeType {
 				type: 'options',
 				displayOptions: { show: { resource: ['customer'] } },
 				options: [
+					{ name: 'Create', value: 'create', action: 'Create a customer' },
 					{ name: 'Search by ID', value: 'getById', action: 'Search by ID in customer' },
 					{ name: 'Search by Name', value: 'getByName', action: 'Search by name in customer' },
 					{ name: 'Search by Order ID', value: 'getByOrderId', action: 'Search by order ID in customer' },
@@ -160,6 +162,7 @@ export class TaxMetall implements INodeType {
 				type: 'options',
 				displayOptions: { show: { resource: ['lieferant'] } },
 				options: [
+					{ name: 'Create', value: 'create', action: 'Create a supplier' },
 					{ name: 'Search by Article', value: 'getByArticle', action: 'Search by article in supplier' },
 					{ name: 'Search by ID', value: 'getById', action: 'Search by ID in supplier' },
 					{ name: 'Search by Name', value: 'getByName', action: 'Search by name in supplier' },
@@ -286,6 +289,45 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 
+			// ─── PARAMETERS: Article → create ────────────────────────────────────────
+			{
+				displayName: 'Name',
+				name: 'articleCreateBezeichnung',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['article'], operation: ['create'] } },
+				default: '',
+				description: 'Article name / description (Bezeichnung)',
+			},
+			{
+				displayName: 'Unit of Measure',
+				name: 'articleCreateME',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['article'], operation: ['create'] } },
+				default: '',
+				description: 'Unit of measure (e.g. Stk, m, kg)',
+				placeholder: 'Stk',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'articleCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['article'], operation: ['create'] } },
+				options: [
+					{ displayName: 'Article Number', name: 'artikelnr', type: 'string', default: '', description: 'Article number. If left empty, the next number from the configured number range is used.' },
+					{ displayName: 'Bill of Materials', name: 'stueckliste', type: 'number', default: 0, description: '0 = not a bill of materials, 1 = is a bill of materials' },
+					{ displayName: 'Custom Tariff Number', name: 'zolltarifnr', type: 'string', default: '' },
+					{ displayName: 'Drawing Number', name: 'zeichnungsnr', type: 'string', default: '' },
+					{ displayName: 'Manufacturing Indicator', name: 'fertigungskz', type: 'number', default: 0, description: 'Manufacturing key (FertigungsKz)' },
+					{ displayName: 'Material', name: 'artikelwerkstoff', type: 'string', default: '', description: 'Material designation (e.g. S235, 1.4301)' },
+					{ displayName: 'Preliminary', name: 'vorlaeufig', type: 'boolean', default: false, description: 'Whether to mark the article as preliminary (Vorläufig)' },
+					{ displayName: 'Revision Number', name: 'revisionsnr', type: 'string', default: '' },
+				],
+			},
+
 			// ─── PARAMETERS: Order ────────────────────────────────────────────────────
 			{
 				displayName: 'Order Number',
@@ -390,6 +432,35 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 
+			// ─── PARAMETERS: Customer → create ───────────────────────────────────────
+			{
+				displayName: 'Company Name',
+				name: 'customerCreateName',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['customer'], operation: ['create'] } },
+				default: '',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'customerCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['customer'], operation: ['create'] } },
+				options: [
+					{ displayName: 'City', name: 'ort', type: 'string', default: '' },
+					{ displayName: 'Country', name: 'staat', type: 'string', default: '' },
+					{ displayName: 'Email', name: 'emailadresse', type: 'string', default: '' },
+					{ displayName: 'ISO Country Code', name: 'isolkz', type: 'string', default: '', description: 'Two-letter ISO country code (e.g. DE, AT, CH)' },
+					{ displayName: 'Name Addition', name: 'namenzusatz', type: 'string', default: '' },
+					{ displayName: 'Phone', name: 'telefon', type: 'string', default: '' },
+					{ displayName: 'Postal Code', name: 'plz', type: 'string', default: '' },
+					{ displayName: 'Street', name: 'strasse', type: 'string', default: '' },
+					{ displayName: 'Website', name: 'internetadresse', type: 'string', default: '' },
+				],
+			},
+
 			// ─── PARAMETERS: Supplier ─────────────────────────────────────────────────
 			{
 				displayName: 'Supplier Number',
@@ -416,6 +487,35 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['lieferant'], operation: ['getByArticle'] } },
 				default: '',
 				description: 'Article number from the supplier-article assignment table',
+			},
+
+			// ─── PARAMETERS: Supplier → create ───────────────────────────────────────
+			{
+				displayName: 'Company Name',
+				name: 'lieferantCreateName',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['lieferant'], operation: ['create'] } },
+				default: '',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'lieferantCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['lieferant'], operation: ['create'] } },
+				options: [
+					{ displayName: 'City', name: 'ort', type: 'string', default: '' },
+					{ displayName: 'Country', name: 'staat', type: 'string', default: '' },
+					{ displayName: 'Email', name: 'emailadresse', type: 'string', default: '' },
+					{ displayName: 'ISO Country Code', name: 'isolkz', type: 'string', default: '', description: 'Two-letter ISO country code (e.g. DE, AT, CH)' },
+					{ displayName: 'Name Addition', name: 'namenzusatz', type: 'string', default: '' },
+					{ displayName: 'Phone', name: 'telefon', type: 'string', default: '' },
+					{ displayName: 'Postal Code', name: 'plz', type: 'string', default: '' },
+					{ displayName: 'Street', name: 'strasse', type: 'string', default: '' },
+					{ displayName: 'Website', name: 'internetadresse', type: 'string', default: '' },
+				],
 			},
 
 			// ─── PARAMETERS: Delivery Note ────────────────────────────────────────────
@@ -880,24 +980,48 @@ export class TaxMetall implements INodeType {
 
 				// ── Article ────────────────────────────────────────────────────────────
 				if (resource === 'article') {
-					const qs: Record<string, string> = {};
-					if (operation === 'getById') {
-						qs.aid = this.getNodeParameter('articleId', i) as string;
-					} else if (operation === 'getByArticleNumber') {
-						qs.artikelnr = this.getNodeParameter('articleNumber', i) as string;
-					} else if (operation === 'getByName') {
-						qs.name = this.getNodeParameter('articleName', i) as string;
-					} else if (operation === 'getByDrawingNumber') {
-						qs.zeichnungsnr = this.getNodeParameter('drawingNumber', i) as string;
+					if (operation === 'create') {
+						const additionalFields = this.getNodeParameter('articleCreateAdditionalFields', i) as Record<string, unknown>;
+						const articleBody: Record<string, unknown> = {
+							bezeichnung: this.getNodeParameter('articleCreateBezeichnung', i),
+							mengeneinheit: this.getNodeParameter('articleCreateME', i),
+						};
+						if (additionalFields.artikelnr) articleBody.artikelnr = additionalFields.artikelnr;
+						if (additionalFields.zeichnungsnr) articleBody.zeichnungsnr = additionalFields.zeichnungsnr;
+						if (additionalFields.revisionsnr) articleBody.revisionsnr = additionalFields.revisionsnr;
+						if (additionalFields.fertigungskz && (additionalFields.fertigungskz as number) > 0) articleBody.fertigungskz = additionalFields.fertigungskz;
+						if (additionalFields.stueckliste !== undefined) articleBody.stueckliste = additionalFields.stueckliste;
+						if (additionalFields.artikelwerkstoff) articleBody.artikelwerkstoff = additionalFields.artikelwerkstoff;
+						if (additionalFields.zolltarifnr) articleBody.zolltarifnr = additionalFields.zolltarifnr;
+						if (additionalFields.vorlaeufig !== undefined) articleBody.vorlaeufig = additionalFields.vorlaeufig;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-article`,
+							body: articleBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.aid = this.getNodeParameter('articleId', i) as string;
+						} else if (operation === 'getByArticleNumber') {
+							qs.artikelnr = this.getNodeParameter('articleNumber', i) as string;
+						} else if (operation === 'getByName') {
+							qs.name = this.getNodeParameter('articleName', i) as string;
+						} else if (operation === 'getByDrawingNumber') {
+							qs.zeichnungsnr = this.getNodeParameter('drawingNumber', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-articles`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
 					}
-					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
-						method: 'GET',
-						url: `${baseUrl}/api/get-articles`,
-						qs,
-						headers,
-						json: true,
-						...tlsOption,
-					});
 
 				// ── Order ──────────────────────────────────────────────────────────────
 				} else if (resource === 'auftrag') {
@@ -941,41 +1065,89 @@ export class TaxMetall implements INodeType {
 
 				// ── Customer ───────────────────────────────────────────────────────────
 				} else if (resource === 'customer') {
-					const qs: Record<string, string> = {};
-					if (operation === 'getByName') {
-						qs.name = this.getNodeParameter('customerName', i) as string;
-					} else if (operation === 'getById') {
-						qs.kundennr = this.getNodeParameter('customerId', i) as string;
-					} else if (operation === 'getByOrderId') {
-						qs.auftragnr = this.getNodeParameter('orderId', i) as string;
+					if (operation === 'create') {
+						const additionalFields = this.getNodeParameter('customerCreateAdditionalFields', i) as Record<string, string>;
+						const customerBody: Record<string, unknown> = {
+							name: this.getNodeParameter('customerCreateName', i),
+						};
+						if (additionalFields.namenzusatz) customerBody.namenzusatz = additionalFields.namenzusatz;
+						if (additionalFields.strasse) customerBody.strasse = additionalFields.strasse;
+						if (additionalFields.plz) customerBody.plz = additionalFields.plz;
+						if (additionalFields.ort) customerBody.ort = additionalFields.ort;
+						if (additionalFields.staat) customerBody.staat = additionalFields.staat;
+						if (additionalFields.isolkz) customerBody.isolkz = additionalFields.isolkz;
+						if (additionalFields.internetadresse) customerBody.internetadresse = additionalFields.internetadresse;
+						if (additionalFields.emailadresse) customerBody.emailadresse = additionalFields.emailadresse;
+						if (additionalFields.telefon) customerBody.telefon = additionalFields.telefon;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-customer`,
+							body: customerBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getByName') {
+							qs.name = this.getNodeParameter('customerName', i) as string;
+						} else if (operation === 'getById') {
+							qs.kundennr = this.getNodeParameter('customerId', i) as string;
+						} else if (operation === 'getByOrderId') {
+							qs.auftragnr = this.getNodeParameter('orderId', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-customers`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
 					}
-					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
-						method: 'GET',
-						url: `${baseUrl}/api/get-customers`,
-						qs,
-						headers,
-						json: true,
-						...tlsOption,
-					});
 
 				// ── Supplier ───────────────────────────────────────────────────────────
 				} else if (resource === 'lieferant') {
-					const qs: Record<string, string> = {};
-					if (operation === 'getById') {
-						qs.liefernr = this.getNodeParameter('lieferantId', i) as string;
-					} else if (operation === 'getByName') {
-						qs.name = this.getNodeParameter('lieferantName', i) as string;
-					} else if (operation === 'getByArticle') {
-						qs.artikelnr = this.getNodeParameter('lieferantArtikelNr', i) as string;
+					if (operation === 'create') {
+						const additionalFields = this.getNodeParameter('lieferantCreateAdditionalFields', i) as Record<string, string>;
+						const lieferantBody: Record<string, unknown> = {
+							name: this.getNodeParameter('lieferantCreateName', i),
+						};
+						if (additionalFields.namenzusatz) lieferantBody.namenzusatz = additionalFields.namenzusatz;
+						if (additionalFields.strasse) lieferantBody.strasse = additionalFields.strasse;
+						if (additionalFields.plz) lieferantBody.plz = additionalFields.plz;
+						if (additionalFields.ort) lieferantBody.ort = additionalFields.ort;
+						if (additionalFields.staat) lieferantBody.staat = additionalFields.staat;
+						if (additionalFields.isolkz) lieferantBody.isolkz = additionalFields.isolkz;
+						if (additionalFields.internetadresse) lieferantBody.internetadresse = additionalFields.internetadresse;
+						if (additionalFields.emailadresse) lieferantBody.emailadresse = additionalFields.emailadresse;
+						if (additionalFields.telefon) lieferantBody.telefon = additionalFields.telefon;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-supplier`,
+							body: lieferantBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.liefernr = this.getNodeParameter('lieferantId', i) as string;
+						} else if (operation === 'getByName') {
+							qs.name = this.getNodeParameter('lieferantName', i) as string;
+						} else if (operation === 'getByArticle') {
+							qs.artikelnr = this.getNodeParameter('lieferantArtikelNr', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-suppliers`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
 					}
-					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
-						method: 'GET',
-						url: `${baseUrl}/api/get-suppliers`,
-						qs,
-						headers,
-						json: true,
-						...tlsOption,
-					});
 
 				// ── Delivery Note ──────────────────────────────────────────────────────
 				} else if (resource === 'lieferschein') {
