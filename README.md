@@ -130,6 +130,21 @@ General-purpose ERP node for querying and creating records across all TaxMetall 
 | Search by name | Find suppliers by partial name match | Name |
 | Search by article | Find all suppliers linked to an article | Article number |
 
+##### DMS
+
+Uploads a file to the TaxDMS document management system (Vectotax Software GmbH). The file is transferred as a Base64-encoded payload together with structured metadata.
+
+| Operation | Description | Required Parameters |
+|---|---|---|
+| Create File | Upload a binary file with metadata to TaxDMS | Data (JSON), File (Binary) |
+
+**Fields**
+
+| Field | Description |
+|---|---|
+| **Data (JSON)** | Metadata object passed to the DMS endpoint (structure defined by your TaxDMS configuration) |
+| **File (Binary)** | Name of the n8n binary property that holds the file to upload (e.g. `data`) |
+
 ##### Dunning (Mahnung)
 
 | Operation | Description | Required Parameters |

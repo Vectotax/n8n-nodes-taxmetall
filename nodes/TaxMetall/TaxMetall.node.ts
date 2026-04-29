@@ -1,4 +1,4 @@
-import {
+﻿import {
 	IExecuteFunctions,
 	ILoadOptionsFunctions,
 	INodeExecutionData,
@@ -40,6 +40,7 @@ export class TaxMetall implements INodeType {
 				auftrag: 'Order',
 				eingangsrechnung: 'Purchase Invoice',
 				customer: 'Customer',
+				dms: 'DMS',
 				lieferant: 'Supplier',
 				lieferschein: 'Delivery Note',
 				mahnung: 'Dunning',
@@ -59,6 +60,7 @@ export class TaxMetall implements INodeType {
 				getBySupplier: 'Search by Supplier',
 				getByDateRange: 'Search by Date Range',
 				getStatus: 'Get Status',
+				createFile: 'Create File',
 			}[$parameter["operation"]] ?? $parameter["operation"])
 		}}`,
 		defaults: {
@@ -84,6 +86,8 @@ export class TaxMetall implements INodeType {
 					{ name: 'Article', value: 'article' },
 					{ name: 'Customer', value: 'customer' },
 					{ name: 'Delivery Note', value: 'lieferschein' },
+					// eslint-disable-next-line n8n-nodes-base/node-param-resource-with-plural-option
+					{ name: 'DMS', value: 'dms' },
 					{ name: 'Dunning', value: 'mahnung' },
 					{ name: 'Invoice', value: 'rechnung' },
 					{ name: 'Offer', value: 'offer' },
@@ -182,6 +186,18 @@ export class TaxMetall implements INodeType {
 					{ name: 'Search by Delivery Note No.', value: 'getById', action: 'Search by delivery note number in delivery note' },
 				],
 				default: 'getById',
+				noDataExpression: true,
+			},
+			// DMS
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['dms'] } },
+				options: [
+					{ name: 'Create File', value: 'createFile', action: 'Create a file in DMS' },
+				],
+				default: 'createFile',
 				noDataExpression: true,
 			},
 			// Dunning
@@ -925,6 +941,25 @@ export class TaxMetall implements INodeType {
 					{ displayName: 'Warehouse', name: 'Lagerort', type: 'string', default: '', description: 'SQL parameter: Lagerort' },
 				],
 			},
+
+			// ─── PARAMETERS: DMS ──────────────────────────────────────────────────────────
+			{
+				displayName: 'Data (JSON)',
+				name: 'dmsData',
+				type: 'json',
+				required: true,
+				displayOptions: { show: { resource: ['dms'], operation: ['createFile'] } },
+				default: '{}',
+			},
+			{
+				displayName: 'File (Binary)',
+				name: 'dmsBinaryProperty',
+				type: 'string',
+				required: true,
+				default: 'data',
+				displayOptions: { show: { resource: ['dms'], operation: ['createFile'] } },
+				description: 'Name of the binary property that contains the file (e.g. "data")',
+			},
 		],
 		usableAsTool: true,
 	};
@@ -1338,6 +1373,28 @@ export class TaxMetall implements INodeType {
 							method: 'GET',
 							url: `${baseUrl}/api/get-akquise`,
 							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					}
+
+				// ── DMS ────────────────────────────────────────────────────────────────────
+				} else if (resource === 'dms') {
+					if (operation === 'createFile') {
+						const dmsData = this.getNodeParameter('dmsData', i) as string;
+						const binaryPropertyName = this.getNodeParameter('dmsBinaryProperty', i) as string;
+						const binaryData = this.helpers.assertBinaryData(i, binaryPropertyName);
+						const fileBase64 = (await this.helpers.getBinaryDataBuffer(i, binaryPropertyName)).toString('base64');
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-dms-file`,
+							body: {
+								data: JSON.parse(dmsData),
+								file: fileBase64,
+								fileName: binaryData.fileName,
+								mimeType: binaryData.mimeType,
+							},
 							headers,
 							json: true,
 							...tlsOption,
