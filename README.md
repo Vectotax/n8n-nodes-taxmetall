@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@vectotaxsoftwaregmbh/n8n-nodes-taxmetall.svg)](https://www.npmjs.com/package/@vectotaxsoftwaregmbh/n8n-nodes-taxmetall)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An [n8n](https://n8n.io/) community node package that integrates **TaxMetall ERP** into your workflows. Query customers, articles, orders, invoices, suppliers, delivery notes, offers, dunning records, and execute custom statistics reports — all directly from n8n.
+An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP** and **TaxDMS** to your workflows. Read and create records across all major ERP domains — customers, articles, orders, offers, invoices, delivery notes, purchase invoices, suppliers, dunning — and run custom SQL reports and upload documents to TaxDMS, all directly from n8n.
 
 [TaxMetall](https://www.vectotax.de) is an ERP system for metal trading and processing companies, developed by Vectotax Software GmbH.
 
@@ -13,8 +13,19 @@ An [n8n](https://n8n.io/) community node package that integrates **TaxMetall ERP
 
 - [Installation](#installation)
 - [Credentials](#credentials)
-- [Nodes](#nodes)
-  - [TaxMetall](#taxmetall)
+- [Node: TaxMetall ERP](#node-taxmetall-erp)
+  - [Acquisition](#acquisition)
+  - [Article](#article)
+  - [Customer](#customer)
+  - [Delivery Note](#delivery-note)
+  - [DMS](#dms)
+  - [Dunning](#dunning)
+  - [Invoice](#invoice)
+  - [Offer](#offer)
+  - [Order](#order)
+  - [Purchase Invoice](#purchase-invoice)
+  - [Statistic](#statistic)
+  - [Supplier](#supplier)
 - [Compatibility](#compatibility)
 - [Resources](#resources)
 - [License](#license)
@@ -40,176 +51,473 @@ npm install @vectotaxsoftwaregmbh/n8n-nodes-taxmetall
 
 ## Credentials
 
-Create a **TaxMetall API** credential in n8n (**Settings → Credentials → New**).
+Create a **TaxMetall API** credential in n8n (**Settings → Credentials → New → TaxMetall API**).
 
-| Field | Description | Example |
+| Field | Required | Description |
 |---|---|---|
-| **Base URL** | URL of your TaxMetall API service | `https://api.example.com:8443` |
-| **API Key** | The `tax-api-key` configured in your TaxMetall API service | `your-secret-api-key` |
-| **Use ngrok Tunnel** | Enable if your TaxMetall instance is accessed via an ngrok tunnel (default: off) | — |
-| **Allow Self-Signed Certificates** | Disable TLS certificate validation — enable only for on-premises installations using self-signed certificates (default: off) | — |
+| **Base URL** | Yes | URL of your TaxMetall API service, e.g. `https://api.example.com:8443` |
+| **API Key** | Yes | The `tax-api-key` configured in your TaxMetall API service |
+| **Use ngrok Tunnel** | No | Enable if your TaxMetall instance is accessed via an ngrok tunnel — adds the `ngrok-skip-browser-warning` header to bypass the ngrok browser interstitial page |
+| **Allow Self-Signed Certificates** | No | Disable TLS certificate validation — enable only for on-premises installations using self-signed certificates |
 
-The API key is sent as the `tax-api-key` HTTP header with every request.
-
-> **ngrok users:** If your TaxMetall API service is exposed via ngrok and you do not have a custom domain, enable the **Use ngrok Tunnel** toggle in the credentials. This adds the `ngrok-skip-browser-warning` header to all requests, which is required to bypass the ngrok interstitial page.
-
-> **Self-signed certificates:** If your TaxMetall API service runs on-premises with a self-signed TLS certificate, enable **Allow Self-Signed Certificates**. Leave this off in all other cases — disabling certificate validation on untrusted networks exposes your API key to interception.
+The API key is automatically injected as the `tax-api-key` HTTP header with every request.
 
 ---
 
-## Nodes
+## Node: TaxMetall ERP
 
-### TaxMetall
+The **TaxMetall ERP** node covers all major TaxMetall domains. Select a **Resource** and then an **Operation** to configure the node.
 
-General-purpose ERP node for querying and creating records across all TaxMetall domains.
+---
 
-#### Resources and Operations
+### Acquisition
 
-##### Article (Artikel)
+Manages acquisition/lead contacts in TaxMetall.
 
-| Operation | Description | Required Parameters |
+#### Create
+
+Creates a new acquisition entry.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by article ID | Retrieve an article by its internal ID | Article ID |
-| Search by article number | Find an article by its exact number | Article number |
-| Search by name | Search articles by partial name match | Name |
-| Search by drawing number | Find articles by drawing/part number | Drawing number |
+| Email | Yes | Contact email address |
+| Company | Yes | Company name |
+| First Name | No | Contact first name |
+| Last Name | No | Contact last name |
+| Phone | No | Phone number |
+| Street | No | Street address |
+| Postal Code | No | Postal code |
+| City | No | City |
+| Country | No | Country |
+| Lead Source | No | Origin of the lead (e.g. trade fair, website) |
+| Campaign Info | No | Associated campaign |
+| Perspective Lead ID | No | External ID from Perspective CRM |
 
-##### Customer (Kunde)
+#### Search by ID
 
-| Operation | Description | Required Parameters |
+Returns a single acquisition entry by its internal contact number.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by ID | Retrieve a customer by their customer number | Customer number |
-| Search by name | Find customers by partial name match | Name |
-| Search by order ID | Find the customer associated with an order | Order number |
+| Acquisition ID | Yes | Internal contact number (KontaktNr) |
 
-##### Order (Auftrag)
+#### Search by Name
 
-| Operation | Description | Required Parameters |
+Searches acquisition entries by partial match on company or contact name.
+
+| Field | Required | Description |
 |---|---|---|
-| Get order status | Retrieve a full order including line items | Order number |
-| Search by date range | List all orders within a date range | Date from, Date to |
+| Name | Yes | Partial name to search for |
 
-##### Offer (Angebot)
+#### Search by Date Range
 
-| Operation | Description | Required Parameters |
+Lists acquisition entries by their first contact date.
+
+| Field | Required | Description |
 |---|---|---|
-| Create | Create a new offer | Customer ID, Article ID |
-| Search by offer number | Retrieve an offer including line items | Offer number |
-| Search by customer | List all offers for a customer | Customer number |
-| Search by date range | List all offers within a date range | Date from, Date to |
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
 
-##### Invoice (Rechnung)
+---
 
-| Operation | Description | Required Parameters |
+### Article
+
+Manages articles (Artikel) in TaxMetall.
+
+#### Create
+
+Creates a new article. If no article number is provided, the next number from the configured number range is used automatically.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by invoice number | Retrieve an invoice including line items | Invoice number |
-| Search by customer | List all invoices for a customer | Customer number |
-| Search by date range | List all invoices within a date range | Date from, Date to |
+| Name | Yes | Article name / description (Bezeichnung) |
+| Unit of Measure | Yes | Unit of measure, e.g. `Stk`, `m`, `kg` |
+| Article Number | No | Article number — auto-assigned if left empty |
+| Drawing Number | No | Drawing or part number (Zeichnungsnr) |
+| Revision Number | No | Revision index |
+| Material | No | Material designation, e.g. `S235`, `1.4301` |
+| Manufacturing Indicator | No | Manufacturing key (FertigungsKz) |
+| Bill of Materials | No | `0` = no BOM, `1` = is a BOM |
+| Custom Tariff Number | No | Customs tariff number (Zolltarifnr) |
+| Preliminary | No | Mark article as preliminary (Vorläufig) |
 
-##### Purchase Invoice (Eingangsrechnung)
+#### Search by Article ID
 
-| Operation | Description | Required Parameters |
+Returns an article by its internal numeric ID.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by ER number | Retrieve a purchase invoice including line items | ER number (+ optional supplier number) |
-| Search by supplier | List all purchase invoices for a supplier | Supplier number |
-| Search by date range | List all purchase invoices within a date range | Date from, Date to |
+| Article ID | Yes | Internal article ID (AID) |
 
-##### Delivery Note (Lieferschein)
+#### Search by Article Number
 
-| Operation | Description | Required Parameters |
+Returns an article by its exact article number.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by delivery note number | Retrieve a delivery note including line items | Delivery note number |
-| Search by customer | List all delivery notes for a customer | Customer number |
-| Search by date range | List all delivery notes within a date range | Date from, Date to |
+| Article Number | Yes | Article number (Artikelnr) |
 
-##### Supplier (Lieferant)
+#### Search by Drawing Number
 
-| Operation | Description | Required Parameters |
+Searches articles by drawing or part number.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by ID | Retrieve a supplier by their supplier number | Supplier number |
-| Search by name | Find suppliers by partial name match | Name |
-| Search by article | Find all suppliers linked to an article | Article number |
+| Drawing Number | Yes | Drawing number (Zeichnungsnr) |
 
-##### DMS
+#### Search by Name
 
-Uploads a file to the TaxDMS document management system (Vectotax Software GmbH). The file is transferred as a Base64-encoded payload together with structured metadata.
+Searches articles by partial match on the article name.
 
-| Operation | Description | Required Parameters |
+| Field | Required | Description |
 |---|---|---|
-| Create File | Upload a binary file with metadata to TaxDMS | Data (JSON), File (Binary) |
+| Name | Yes | Partial name to search for |
 
-**Fields**
+---
 
-| Field | Description |
-|---|---|
-| **Data (JSON)** | Metadata object passed to the DMS endpoint (structure defined by your TaxDMS configuration) |
-| **File (Binary)** | Name of the n8n binary property that holds the file to upload (e.g. `data`) |
+### Customer
 
-##### Dunning (Mahnung)
+Manages customers (Kunden) in TaxMetall.
 
-| Operation | Description | Required Parameters |
+#### Create
+
+Creates a new customer.
+
+| Field | Required | Description |
 |---|---|---|
-| Search by customer | List all open dunning items for a customer | Customer number |
-| Search by due date range | List all open dunning items by due date | Date from, Date to |
+| Company Name | Yes | Customer company name |
+| Name Addition | No | Additional name line (Namenzusatz) |
+| Street | No | Street address |
+| Postal Code | No | Postal code |
+| City | No | City |
+| Country | No | Country name |
+| ISO Country Code | No | Two-letter ISO code, e.g. `DE`, `AT`, `CH` |
+| Email | No | Email address |
+| Phone | No | Phone number |
+| Website | No | Website URL |
 
-> **Note:** Dunning records are not independent documents in TaxMetall. They are a filtered view of the invoice table (open balance > 0, not a credit note, no dunning block).
+#### Search by ID
 
-##### Acquisition (Akquise)
+Returns a customer by their customer number.
 
-| Operation | Description | Required Parameters |
+| Field | Required | Description |
 |---|---|---|
-| Create | Create a new acquisition/lead entry | Company name, email address |
-| Search by ID | Retrieve an acquisition entry by internal ID | Acquisition ID |
-| Search by name | Find acquisition entries by company or contact name | Name |
-| Search by date range | List acquisition entries by first contact date | Date from, Date to |
+| Customer ID | Yes | Customer number (Kundennr) |
 
-##### Statistic
+#### Search by Name
 
-Executes pre-configured SQL reports stored in TaxMetall and returns the results as a JSON array. This allows every custom report and Business Cockpit report defined in your TaxMetall installation to be used directly inside n8n workflows.
+Searches customers by partial match on their company name.
 
-The node dynamically loads all available reports for the authenticated tenant and presents them in a dropdown. Each option shows the report name and the parameters it requires.
-
-| Operation | Description |
-|---|---|
-| Execute | Run a report and return the results as a JSON array |
-
-**Fields**
-
-| Field | Type | Description |
+| Field | Required | Description |
 |---|---|---|
-| **Statistic / Report** | Dropdown | Select the report to execute — the description lists expected parameters |
-| **Date From** | Date | Start of the reporting period (SQL parameter: `DatumVon`) |
-| **Date To** | Date | End of the reporting period (SQL parameter: `DatumBis`) |
-| **Comparison From** | Date | Start of an optional comparison period (SQL parameter: `VergleichVon`) |
-| **Comparison To** | Date | End of an optional comparison period (SQL parameter: `VergleichBis`) |
-| **Additional Parameters** | Collection | Optional filter parameters depending on the report |
+| Customer Name | Yes | Partial name to search for |
 
-**Additional parameters**
+#### Search by Order ID
 
-| Field | SQL Name | Description |
+Returns the customer associated with a given order number.
+
+| Field | Required | Description |
+|---|---|---|
+| Order ID | Yes | Order number (Auftragnr) |
+
+---
+
+### Delivery Note
+
+Reads delivery notes (Lieferscheine) including their line items.
+
+#### Search by Delivery Note No.
+
+Returns a single delivery note with all its line items.
+
+| Field | Required | Description |
+|---|---|---|
+| Delivery Note Number | Yes | Delivery note number (Lieferscheinnr) |
+
+#### Search by Customer No.
+
+Lists all delivery notes for a given customer.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer Number | Yes | Customer number (Kundennr) |
+
+#### Search by Date Range
+
+Lists all delivery notes within a date range.
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
+### DMS
+
+Uploads files to the **TaxDMS** document management system (Vectotax Software GmbH).
+
+#### Create File
+
+Uploads a binary file together with a metadata object to TaxDMS via the `/api/create-dms-file` endpoint. The file is transferred as Base64.
+
+| Field | Required | Description |
+|---|---|---|
+| Data (JSON) | Yes | Metadata object — structure defined by your TaxDMS configuration |
+| File (Binary) | Yes | Name of the n8n binary property that holds the file, e.g. `data` |
+
+> **Tip:** Use an **HTTP Request** node, a **Read Binary File** node, or any node that outputs a binary property to provide the file. The value of **File (Binary)** must match the property name under which n8n stores the file in that node's output.
+
+---
+
+### Dunning
+
+Reads open dunning items (Mahnungen). Dunning records are not independent documents in TaxMetall — they are a filtered view of the invoice table (open balance > 0, not a credit note, no dunning block active).
+
+#### Search by Customer No.
+
+Lists all open dunning items for a specific customer.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer Number | Yes | Customer number (Kundennr) |
+| Due Date From | No | Optional: filter by due date start (`yyyy-mm-dd`) |
+| Due Date To | No | Optional: filter by due date end (`yyyy-mm-dd`) |
+| Dunning Level | No | Show only items of this dunning level — `0` = all levels |
+| Include Blocked | No | Include items with dunning block (Mahnsperre) — default: off |
+| Include Paid | No | Include already paid items — default: off |
+
+#### Search by Due Date Range
+
+Lists all open dunning items within a due date range.
+
+| Field | Required | Description |
+|---|---|---|
+| Due Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Due Date To | Yes | End date in format `yyyy-mm-dd` |
+| Dunning Level | No | Show only items of this dunning level — `0` = all levels |
+| Include Blocked | No | Include items with dunning block — default: off |
+| Include Paid | No | Include already paid items — default: off |
+
+---
+
+### Invoice
+
+Reads invoices (Rechnungen) including their line items.
+
+#### Search by Invoice No.
+
+Returns a single invoice with all its line items.
+
+| Field | Required | Description |
+|---|---|---|
+| Invoice Number | Yes | Invoice number (Rechnungnr) |
+
+#### Search by Customer No.
+
+Lists all invoices for a given customer.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer Number | Yes | Customer number (Kundennr) |
+
+#### Search by Date Range
+
+Lists all invoices within a date range (by invoice date).
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
+### Offer
+
+Manages offers (Angebote) in TaxMetall.
+
+#### Create
+
+Creates a new offer for a customer with one article position. Either **Article ID** or **Article Number** must be provided — if both are set, Article ID takes precedence.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer ID | Yes | Customer number (Kundennr) |
+| Article ID | No* | Numeric internal article ID |
+| Article Number | No* | Article number as text — used when Article ID is `0` |
+| Quantity | No | Quantity for the position — default: `1` |
+
+*At least one of Article ID or Article Number must be provided.
+
+#### Search by Offer No.
+
+Returns a single offer with all its line items.
+
+| Field | Required | Description |
+|---|---|---|
+| Offer Number | Yes | Offer number (Angebotsnr) |
+
+#### Search by Customer No.
+
+Lists all offers for a given customer.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer Number | Yes | Customer number (Kundennr) |
+
+#### Search by Date Range
+
+Lists all offers within a date range (by offer date).
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
+### Order
+
+Reads orders (Aufträge) from TaxMetall.
+
+#### Get Order Status
+
+Returns a single order including all its line items and current production status.
+
+| Field | Required | Description |
+|---|---|---|
+| Order Number | Yes | Internal order number (Auftragnr) |
+
+#### Search by Date Range
+
+Lists all orders within a date range.
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
+### Purchase Invoice
+
+Reads incoming purchase invoices (Eingangsrechnungen) including their line items.
+
+#### Search by Purchase Invoice No.
+
+Returns a purchase invoice by its invoice number. If multiple entries share the same invoice number (from different suppliers), add the supplier number to narrow the result.
+
+| Field | Required | Description |
+|---|---|---|
+| Purchase Invoice Number | Yes | Purchase invoice number (ERNr) |
+| Supplier Number | No | Supplier number to narrow results when the invoice number is not unique |
+
+#### Search by Supplier
+
+Lists all purchase invoices for a given supplier.
+
+| Field | Required | Description |
+|---|---|---|
+| Supplier Number | Yes | Supplier number (Liefernr) |
+
+#### Search by Date Range
+
+Lists all purchase invoices within a date range (by invoice date).
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
+### Statistic
+
+Executes pre-configured SQL reports stored in TaxMetall and returns the results as a JSON array. This covers both custom SQL reports and Business Cockpit reports defined in your TaxMetall installation.
+
+The available reports are loaded dynamically from the API and presented in a dropdown — each option shows the report name and which parameters it requires.
+
+> **Note:** Only reports of type **Individual** (Individuell) and **Business Cockpit** (BC) are supported. Static system reports (Statisch) are not available because their SQL is not stored in the database.
+
+#### Execute
+
+| Field | Required | Description |
+|---|---|---|
+| Statistics / Report | Yes | Select the report from the dropdown — the description shows which parameters are needed |
+| Date From | No | Start of the reporting period (SQL parameter: `DatumVon`) |
+| Date To | No | End of the reporting period (SQL parameter: `DatumBis`) |
+| Comparison From | No | Start of an optional comparison period (SQL parameter: `VergleichVon`) |
+| Comparison To | No | End of an optional comparison period (SQL parameter: `VergleichBis`) |
+
+**Additional Parameters** (collection — add only what the report requires):
+
+| Field | SQL Parameter | Description |
 |---|---|---|
 | Article No. | `Artikel` | Filter by article number |
 | Article Group | `ArtikelGruppe` | Filter by article group |
 | Order No. | `Auftrag` | Filter by order number |
+| Order Position | `AuftragsPos` | Filter by order position |
 | Order Type | `AuftragsArt` | Filter by order type code |
 | Business Area | `GeschBereich` | Filter by business area |
 | Customer No. | `Kunden` | Filter by customer number |
 | Warehouse | `Lagerort` | Filter by warehouse code |
 | Supplier No. | `Lieferanten` | Filter by supplier number |
 | Employee | `Mitarbeiter` | Filter by employee code |
+| Offer No. | `Angebot` | Filter by offer number |
+| Offer Position | `AngebotsPos` | Filter by offer position |
 | Project No. | `Projekt` | Filter by project ID |
 | Purchase Order No. | `Bestellung` | Filter by purchase order number |
+| Purchase Order Position | `BestellPos` | Filter by purchase order position |
 | Value Range From | `WertebereichVon` | Numeric start value for range filters |
 | Value Range To | `WertebereichBis` | Numeric end value for range filters |
-| Variable 1 | `Variable1` | Free text value |
+| Variable 1 | `Variable1` | Free text parameter |
 
-**Supported report types**
+---
 
-| Type | Available | Description |
+### Supplier
+
+Manages suppliers (Lieferanten) in TaxMetall.
+
+#### Create
+
+Creates a new supplier.
+
+| Field | Required | Description |
 |---|---|---|
-| Individual (Individuell) | Yes | Custom SQL reports defined by the tenant |
-| Business Cockpit (BC) | Yes | Reports from the Business Cockpit module |
-| Static (Statisch) | No | Hardcoded system reports — SQL is not stored in the database |
+| Company Name | Yes | Supplier company name |
+| Name Addition | No | Additional name line (Namenzusatz) |
+| Street | No | Street address |
+| Postal Code | No | Postal code |
+| City | No | City |
+| Country | No | Country name |
+| ISO Country Code | No | Two-letter ISO code, e.g. `DE`, `AT`, `CH` |
+| Email | No | Email address |
+| Phone | No | Phone number |
+| Website | No | Website URL |
+
+#### Search by ID
+
+Returns a supplier by their supplier number.
+
+| Field | Required | Description |
+|---|---|---|
+| Supplier Number | Yes | Supplier number (Liefernr) |
+
+#### Search by Name
+
+Searches suppliers by partial match on their company name.
+
+| Field | Required | Description |
+|---|---|---|
+| Name | Yes | Partial name to search for |
+
+#### Search by Article
+
+Returns all suppliers linked to a specific article via the supplier-article assignment table.
+
+| Field | Required | Description |
+|---|---|---|
+| Article Number | Yes | Article number from the supplier-article assignment |
 
 ---
 
