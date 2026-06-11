@@ -1,6 +1,6 @@
 {
   "name": "@vectotaxsoftwaregmbh/n8n-nodes-taxmetall",
-  "version": "1.10.1",
+  "version": "1.10.2",
   "description": "n8n community node for TaxMetall ERP — read customers, articles, orders, offers, invoices, delivery notes, purchase invoices, suppliers, dunning, and execute statistics queries via the TaxMetall REST API.",
   "license": "MIT",
   "homepage": "https://www.vectotax.de",
@@ -45,7 +45,7 @@
     ]
   },
   "devDependencies": {
-    "@n8n/node-cli": "*",
+    "@n8n/node-cli": "0.13.0",
     "n8n-workflow": "*",
     "eslint": "9.32.0",
     "prettier": "3.6.2",
