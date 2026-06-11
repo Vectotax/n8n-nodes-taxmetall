@@ -7,6 +7,7 @@
 	INodeTypeDescription,
 	NodeApiError,
 	NodeConnectionTypes,
+	NodeOperationError,
 } from 'n8n-workflow';
 import type { JsonObject } from 'n8n-workflow';
 
@@ -124,6 +125,7 @@ export class TaxMetall implements INodeType {
 				type: 'options',
 				displayOptions: { show: { resource: ['auftrag'] } },
 				options: [
+					{ name: 'Create', value: 'create', action: 'Create an order' },
 					{ name: 'Get Order Status', value: 'getStatus', action: 'Get order status in order' },
 					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in order' },
 				],
@@ -353,6 +355,72 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['auftrag'], operation: ['getStatus'] } },
 				default: '',
 				description: 'Internal order number (Auftragnr)',
+			},
+
+			// ─── PARAMETERS: Order -> create ─────────────────────────────────────────
+			{
+				displayName: 'Customer ID',
+				name: 'auftragCustId',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['auftrag'], operation: ['create'] } },
+				default: '',
+				description: 'Customer number (customerid) the order is created for',
+			},
+			{
+				displayName: 'Positions',
+				name: 'auftragPositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['auftrag'], operation: ['create'] } },
+				description: 'One or more order positions (articles with quantity)',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+								displayName: 'Article ID',
+								name: 'articleid',
+								type: 'number',
+								default: 0,
+								description: 'Numeric article ID (articleid). Alternatively specify an article number below.',
+							},
+							{
+								displayName: 'Article Number',
+								name: 'artikelnr',
+								type: 'string',
+								default: '',
+								description: 'Article number as text (artikelnr). Used when Article ID = 0.',
+							},
+							{
+								displayName: 'Quantity',
+								name: 'menge',
+								type: 'number',
+								default: 1,
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'auftragCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['auftrag'], operation: ['create'] } },
+				options: [
+					{
+						displayName: 'Create Calculation',
+						name: 'kalkulation',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to freeze the bill of materials and create the calculation (work plan / material) for each position. Off by default.',
+					},
+				],
 			},
 			{
 				displayName: 'Date From',
@@ -1060,21 +1128,66 @@ export class TaxMetall implements INodeType {
 
 				// ── Order ──────────────────────────────────────────────────────────────
 				} else if (resource === 'auftrag') {
-					const qs: Record<string, string> = {};
-					if (operation === 'getStatus') {
-						qs.auftragnr = this.getNodeParameter('auftragsNr', i) as string;
-					} else if (operation === 'getByDateRange') {
-						qs.von = this.getNodeParameter('auftragVon', i) as string;
-						qs.bis = this.getNodeParameter('auftragBis', i) as string;
+					if (operation === 'create') {
+						const positionenRaw = this.getNodeParameter('auftragPositionen', i, {}) as {
+							position?: Array<{ articleid?: number; artikelnr?: string; menge?: number }>;
+						};
+						const additionalFields = this.getNodeParameter('auftragCreateAdditionalFields', i, {}) as Record<string, unknown>;
+
+						const customerId = this.getNodeParameter('auftragCustId', i) as string;
+						if (!customerId) {
+							throw new NodeOperationError(this.getNode(), 'Customer ID is required.', { itemIndex: i });
+						}
+
+						const positionsInput = positionenRaw.position ?? [];
+						if (positionsInput.length === 0) {
+							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
+						}
+						const positionen = positionsInput.map((pos, idx) => {
+							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
+							if (pos.articleid && pos.articleid !== 0) {
+								entry.articleid = pos.articleid;
+							} else if (pos.artikelnr) {
+								entry.artikelnr = pos.artikelnr;
+							} else {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Position ${idx + 1}: an Article ID or Article Number is required.`,
+									{ itemIndex: i },
+								);
+							}
+							return entry;
+						});
+						const auftragBody: Record<string, unknown> = {
+							customerid: customerId,
+							positionen,
+						};
+						if (additionalFields.kalkulation !== undefined) auftragBody.kalkulation = additionalFields.kalkulation;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-order`,
+							body: auftragBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getStatus') {
+							qs.auftragnr = this.getNodeParameter('auftragsNr', i) as string;
+						} else if (operation === 'getByDateRange') {
+							qs.von = this.getNodeParameter('auftragVon', i) as string;
+							qs.bis = this.getNodeParameter('auftragBis', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-orders`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
 					}
-					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
-						method: 'GET',
-						url: `${baseUrl}/api/get-orders`,
-						qs,
-						headers,
-						json: true,
-						...tlsOption,
-					});
 
 				// ── Purchase Invoice ───────────────────────────────────────────────────
 				} else if (resource === 'eingangsrechnung') {

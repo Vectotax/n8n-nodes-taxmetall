@@ -378,7 +378,24 @@ Lists all offers within a date range (by offer date).
 
 ### Order
 
-Reads orders (Aufträge) from TaxMetall.
+Creates and reads orders (Aufträge) in TaxMetall.
+
+#### Create
+
+Creates a new order for a customer with one or more article positions. For each position, either **Article ID** or **Article Number** must be provided — if both are set, Article ID takes precedence. Header and position data (addresses, VAT, prices, discounts, open quantity) are derived automatically from the customer and article master data, and the order totals are calculated.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer ID | Yes | Customer number (Kundennr) the order is created for |
+| Positions | Yes | One or more positions. Add a row per article. |
+| › Article ID | No* | Numeric internal article ID |
+| › Article Number | No* | Article number as text — used when Article ID is `0` |
+| › Quantity | No | Quantity for the position — default: `1` |
+| Create Calculation | No | Freeze the bill of materials and create the calculation (work plan / material) for each position. Off by default. |
+
+*At least one of Article ID or Article Number must be provided per position.
+
+Each created position is marked in the `Text1` field with the note *"Erstellt durch TaxMetall API Service"*.
 
 #### Get Order Status
 
