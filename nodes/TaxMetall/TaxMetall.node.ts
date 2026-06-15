@@ -42,6 +42,7 @@ export class TaxMetall implements INodeType {
 				eingangsrechnung: 'Purchase Invoice',
 				customer: 'Customer',
 				dms: 'DMS',
+				documentSync: 'Document Sync',
 				lieferant: 'Supplier',
 				lieferschein: 'Delivery Note',
 				mahnung: 'Dunning',
@@ -62,6 +63,10 @@ export class TaxMetall implements INodeType {
 				getByDateRange: 'Search by Date Range',
 				getStatus: 'Get Status',
 				createFile: 'Create File',
+				checkNew: 'Check New Documents',
+				downloadFile: 'Download File',
+				transferStatus: 'Transfer Status',
+				createNew: 'Create Document',
 			}[$parameter["operation"]] ?? $parameter["operation"])
 		}}`,
 		defaults: {
@@ -89,6 +94,7 @@ export class TaxMetall implements INodeType {
 					{ name: 'Delivery Note', value: 'lieferschein' },
 					// eslint-disable-next-line n8n-nodes-base/node-param-resource-with-plural-option
 					{ name: 'DMS', value: 'dms' },
+					{ name: 'Document Sync', value: 'documentSync' },
 					{ name: 'Dunning', value: 'mahnung' },
 					{ name: 'Invoice', value: 'rechnung' },
 					{ name: 'Offer', value: 'offer' },
@@ -270,6 +276,21 @@ export class TaxMetall implements INodeType {
 					{ name: 'Execute', value: 'execute', action: 'Execute a statistics report' },
 				],
 				default: 'execute',
+				noDataExpression: true,
+			},
+			// Document Sync
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['documentSync'] } },
+				options: [
+					{ name: 'Check New Documents', value: 'checkNew', action: 'Claim new documents from the sync queue' },
+					{ name: 'Create Document', value: 'createNew', action: 'Create a document from mail data in tax metall' },
+					{ name: 'Download Document File', value: 'downloadFile', action: 'Download a claimed document file' },
+					{ name: 'Report Transfer Status', value: 'transferStatus', action: 'Report the share point transfer status' },
+				],
+				default: 'checkNew',
 				noDataExpression: true,
 			},
 
@@ -1028,6 +1049,185 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['dms'], operation: ['createFile'] } },
 				description: 'Name of the binary property that contains the file (e.g. "data")',
 			},
+
+			// ─── PARAMETERS: Document Sync ────────────────────────────────────────────
+			// Check New Documents
+			{
+				displayName: 'Limit',
+				name: 'docSyncLimit',
+				type: 'number',
+				typeOptions: { minValue: 1 },
+				default: 50,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['checkNew'] } },
+				description: 'Max number of documents to claim from the queue in one call. The service caps this at its configured maximum.',
+			},
+
+			// Download Document File / Report Transfer Status — shared identifiers
+			{
+				displayName: 'Sync ID',
+				name: 'docSyncId',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'transferStatus'] } },
+				description: 'The syncId of the queue entry, as returned by Check New Documents',
+			},
+			{
+				displayName: 'Lease Token',
+				name: 'docSyncLeaseToken',
+				type: 'string',
+				typeOptions: { password: true },
+				required: true,
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'transferStatus'] } },
+				description: 'The leaseToken returned by Check New Documents. It authorizes access to the claimed entry.',
+			},
+
+			// Download Document File
+			{
+				displayName: 'Put Output File in Field',
+				name: 'docSyncBinaryProperty',
+				type: 'string',
+				required: true,
+				default: 'data',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile'] } },
+				description: 'Name of the binary property to write the downloaded file to',
+			},
+
+			// Report Transfer Status
+			{
+				displayName: 'Success',
+				name: 'docSyncSuccess',
+				type: 'boolean',
+				default: true,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
+				description: 'Whether the SharePoint upload succeeded. On false the entry is retried, or marked dead after the configured maximum.',
+			},
+			{
+				displayName: 'SharePoint URL',
+				name: 'docSyncSharePointUrl',
+				type: 'string',
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], success: [true] } },
+				description: 'URL of the uploaded document in SharePoint. Stored under Payload.sharePoint.mainUrl.',
+			},
+			{
+				displayName: 'Error Message',
+				name: 'docSyncError',
+				type: 'string',
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], success: [false] } },
+				description: 'Error text to record for the failed transfer. Drives the retry / dead handling.',
+			},
+
+			// Create Document (WF2)
+			{
+				displayName: 'Area (Bereich)',
+				name: 'wf2Bereich',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Target table / area the document belongs to, e.g. Auftrag_s',
+				placeholder: 'Auftrag_s',
+			},
+			{
+				displayName: 'Document Number (Belegnummer)',
+				name: 'wf2Belegnummer',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Number of the target record the document is attached to',
+			},
+			{
+				displayName: 'SharePoint URL',
+				name: 'wf2SharePointUrl',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Source SharePoint URL of the document. Stored under Payload.sharePoint.mainUrl.',
+			},
+			{
+				displayName: 'Email To',
+				name: 'wf2EmailAn',
+				type: 'string',
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Recipient address for the generated .eml (email.an). Required when the service generates the .eml.',
+			},
+			{
+				displayName: 'Email Fields',
+				name: 'wf2EmailFields',
+				type: 'collection',
+				placeholder: 'Add email field',
+				default: {},
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Further fields of the source email used to build the .eml',
+				options: [
+					{ displayName: 'Date', name: 'datum', type: 'dateTime', default: '', description: 'Date the mail was received (email.datum), ISO 8601' },
+					{ displayName: 'From', name: 'von', type: 'string', default: '', description: 'Sender address (email.von)' },
+					{ displayName: 'HTML', name: 'html', type: 'string', typeOptions: { rows: 4 }, default: '', description: 'HTML body (email.html). Provide Text or HTML.' },
+					{ displayName: 'Message ID', name: 'messageId', type: 'string', default: '', description: 'Unique message ID (email.messageId). Used for deduplication.' },
+					{ displayName: 'Subject', name: 'betreff', type: 'string', default: '', description: 'Email subject (email.betreff)' },
+					{ displayName: 'Text', name: 'text', type: 'string', typeOptions: { rows: 4 }, default: '', description: 'Plain text body (email.text). Provide Text or HTML.' },
+				],
+			},
+			{
+				displayName: 'Attachments',
+				name: 'wf2Attachments',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add attachment',
+				default: {},
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Optional attachments for the generated .eml',
+				options: [
+					{
+						displayName: 'Attachment',
+						name: 'attachment',
+						values: [
+							{
+								displayName: 'Input Binary Field',
+								name: 'binaryProperty',
+								type: 'string',
+								default: '',
+								description: 'Name of the n8n binary property to attach. If set, its content is Base64-encoded automatically and file name / MIME type are taken from it unless overridden below.',
+							},
+							{
+								displayName: 'File Name',
+								name: 'dateiname',
+								type: 'string',
+								default: '',
+								description: 'Attachment file name (dateiname). Overrides the binary file name.',
+							},
+							{
+								displayName: 'MIME Type',
+								name: 'mimeType',
+								type: 'string',
+								default: '',
+								description: 'Attachment MIME type. Overrides the binary MIME type.',
+							},
+							{
+								displayName: 'Content (Base64)',
+								name: 'inhaltBase64',
+								type: 'string',
+								default: '',
+								description: 'Base64-encoded content (inhaltBase64). Used when no Input Binary Field is set.',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Allow Duplicates',
+				name: 'wf2AllowDuplicates',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Whether to skip deduplication. When off (default), a document with an already-seen email.messageId is not created again and duplicate=true is returned.',
+			},
 		],
 		usableAsTool: true,
 	};
@@ -1486,6 +1686,139 @@ export class TaxMetall implements INodeType {
 							method: 'GET',
 							url: `${baseUrl}/api/get-akquise`,
 							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					}
+
+				// ── Document Sync ───────────────────────────────────────────────────────
+				} else if (resource === 'documentSync') {
+					if (operation === 'checkNew') {
+						const checkBody: Record<string, unknown> = {};
+						const limit = this.getNodeParameter('docSyncLimit', i) as number;
+						if (limit && limit > 0) checkBody.limit = limit;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/check-new-documents`,
+							body: checkBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+
+					} else if (operation === 'downloadFile') {
+						const syncId = this.getNodeParameter('docSyncId', i) as string;
+						const leaseToken = this.getNodeParameter('docSyncLeaseToken', i) as string;
+						const binaryPropertyName = this.getNodeParameter('docSyncBinaryProperty', i) as string;
+
+						const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/document-file`,
+							qs: { syncId, token: leaseToken },
+							headers,
+							encoding: 'arraybuffer',
+							returnFullResponse: true,
+							...tlsOption,
+						})) as { body: unknown; headers: Record<string, string> };
+
+						const disposition = response.headers['content-disposition'] ?? '';
+						const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+						const fileName = fileNameMatch ? fileNameMatch[1].trim() : `document-${syncId}`;
+						const mimeType = (response.headers['content-type'] ?? 'application/octet-stream')
+							.split(';')[0]
+							.trim();
+						const binaryData = await this.helpers.prepareBinaryData(
+							response.body as Parameters<typeof this.helpers.prepareBinaryData>[0],
+							fileName,
+							mimeType,
+						);
+
+						returnData.push({
+							json: { syncId, leaseToken, fileName, mimeType },
+							binary: { [binaryPropertyName]: binaryData },
+							pairedItem: { item: i },
+						});
+						continue;
+
+					} else if (operation === 'transferStatus') {
+						const syncId = this.getNodeParameter('docSyncId', i) as string;
+						const leaseToken = this.getNodeParameter('docSyncLeaseToken', i) as string;
+						const success = this.getNodeParameter('docSyncSuccess', i) as boolean;
+						const transferBody: Record<string, unknown> = { syncId, leaseToken, success };
+						if (success) {
+							const sharePointUrl = this.getNodeParameter('docSyncSharePointUrl', i, '') as string;
+							if (sharePointUrl) transferBody.sharePointUrl = sharePointUrl;
+						} else {
+							const transferError = this.getNodeParameter('docSyncError', i, '') as string;
+							if (transferError) transferBody.error = transferError;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/sharepoint-transfer-status`,
+							body: transferBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+
+					} else if (operation === 'createNew') {
+						const emailFields = this.getNodeParameter('wf2EmailFields', i, {}) as Record<string, string>;
+						const emailAn = this.getNodeParameter('wf2EmailAn', i, '') as string;
+						const email: Record<string, unknown> = {};
+						if (emailAn) email.an = emailAn;
+						if (emailFields.von) email.von = emailFields.von;
+						if (emailFields.betreff) email.betreff = emailFields.betreff;
+						if (emailFields.datum) email.datum = emailFields.datum;
+						if (emailFields.messageId) email.messageId = emailFields.messageId;
+						if (emailFields.text) email.text = emailFields.text;
+						if (emailFields.html) email.html = emailFields.html;
+
+						const attachmentsInput = this.getNodeParameter('wf2Attachments', i, {}) as {
+							attachment?: Array<{
+								binaryProperty?: string;
+								dateiname?: string;
+								mimeType?: string;
+								inhaltBase64?: string;
+							}>;
+						};
+						const attachments: Array<Record<string, unknown>> = [];
+						for (const att of attachmentsInput.attachment ?? []) {
+							const entry: Record<string, unknown> = {};
+							if (att.binaryProperty) {
+								const binaryMeta = this.helpers.assertBinaryData(i, att.binaryProperty);
+								const buffer = await this.helpers.getBinaryDataBuffer(i, att.binaryProperty);
+								entry.inhaltBase64 = buffer.toString('base64');
+								entry.dateiname = att.dateiname || binaryMeta.fileName || 'attachment.bin';
+								entry.mimeType = att.mimeType || binaryMeta.mimeType || 'application/octet-stream';
+							} else {
+								if (!att.inhaltBase64) {
+									throw new NodeOperationError(
+										this.getNode(),
+										'Each attachment requires either an Input Binary Field or Base64 content.',
+										{ itemIndex: i },
+									);
+								}
+								entry.inhaltBase64 = att.inhaltBase64;
+								if (att.dateiname) entry.dateiname = att.dateiname;
+								if (att.mimeType) entry.mimeType = att.mimeType;
+							}
+							attachments.push(entry);
+						}
+
+						const createBody: Record<string, unknown> = {
+							bereich: this.getNodeParameter('wf2Bereich', i),
+							belegnummer: this.getNodeParameter('wf2Belegnummer', i),
+							sharePointUrl: this.getNodeParameter('wf2SharePointUrl', i),
+							allowDuplicates: this.getNodeParameter('wf2AllowDuplicates', i, false),
+						};
+						if (Object.keys(email).length > 0) createBody.email = email;
+						if (attachments.length > 0) createBody.attachments = attachments;
+
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-new-dokument`,
+							body: createBody,
 							headers,
 							json: true,
 							...tlsOption,

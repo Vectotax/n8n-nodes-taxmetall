@@ -19,6 +19,7 @@ An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP**
   - [Customer](#customer)
   - [Delivery Note](#delivery-note)
   - [DMS](#dms)
+  - [Document Sync (SharePoint WF1 / WF2)](#document-sync-sharepoint-wf1--wf2)
   - [Dunning](#dunning)
   - [Invoice](#invoice)
   - [Offer](#offer)
@@ -267,6 +268,189 @@ Uploads a binary file together with a metadata object to TaxDMS via the `/api/cr
 | File (Binary) | Yes | Name of the n8n binary property that holds the file, e.g. `data` |
 
 > **Tip:** Use an **HTTP Request** node, a **Read Binary File** node, or any node that outputs a binary property to provide the file. The value of **File (Binary)** must match the property name under which n8n stores the file in that node's output.
+
+---
+
+### Document Sync (SharePoint WF1 / WF2)
+
+Connects the TaxMetall document pocket (Dokutasche) with SharePoint through the TaxMetall sync queue (`SyncQueue`). It implements two workflows:
+
+- **WF1 — Export** (TaxMetall → SharePoint): claim newly created documents from the queue, download each file, upload it to SharePoint, then report the result back so the entry is closed or retried.
+- **WF2 — Import** (SharePoint / mail → TaxMetall): create a document (typically an `.eml` built by the service) in TaxMetall and write a closing audit entry, with optional deduplication by mail message ID.
+
+The service stores the resulting SharePoint URL under `Payload.sharePoint.mainUrl` and, for WF2, the mail ID under `Payload.email.messageId`.
+
+#### Check New Documents
+
+Claims up to **Limit** pending entries from the sync queue and returns a **lease token** plus the list of documents to process (WF1, step 1). Each call generates a fresh lease token; only the holder of that token may download a claimed file or report its status, and the lease expires after the service-configured number of seconds.
+
+| Field | Required | Description |
+|---|---|---|
+| Limit | No | Max number of documents to claim in one call (default `50`). The service caps this at its configured maximum. |
+
+Important response fields:
+
+| Field | Description |
+|---|---|
+| `leaseToken` | Token authorizing access to all claimed entries in this batch |
+| `documents[]` | Entries ready for processing |
+| `documents[].syncId` | Queue entry ID — needed for download and status report |
+| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…&token=…` |
+| `documents[].eventType` | Event type, e.g. `document.created` |
+| `documents[].bereich` / `belegNr` | Target area and document number |
+| `documents[].dateiname` | Source file path/name |
+| `skipped[]` | Entries the service skipped (e.g. DMS reference, file not found) |
+
+#### Download Document File
+
+Downloads the file of a single claimed entry as **binary data** (WF1, step 2). The node parses the file name from the response and sets the MIME type automatically.
+
+| Field | Required | Description |
+|---|---|---|
+| Sync ID | Yes | `syncId` of the entry (from Check New Documents) |
+| Lease Token | Yes | `leaseToken` from the same batch |
+| Put Output File in Field | Yes | Name of the binary property to write the file to (default `data`) |
+
+The downloaded file is placed in the chosen binary property, ready for an upload node (e.g. **HTTP Request** or a **Microsoft SharePoint** node). The item JSON also carries `syncId`, `leaseToken`, `fileName` and `mimeType`.
+
+#### Report SharePoint Transfer Status
+
+Reports the upload result back to the service (WF1, step 4).
+
+| Field | Required | Description |
+|---|---|---|
+| Sync ID | Yes | `syncId` of the entry |
+| Lease Token | Yes | `leaseToken` from the same batch |
+| Success | Yes | `true` = synced successfully, `false` = transfer failed |
+| SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`) |
+| Error Message | No | Shown when **Success** is off — error text recorded for the failed transfer |
+
+**Retry / Dead handling:** on `success = false` the entry is scheduled for a retry after the service-configured interval. Once the configured maximum number of attempts is exceeded, the entry is marked **dead**. Dead entries are not retried automatically but can be reactivated deliberately in the database.
+
+#### Create Document
+
+WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Status = skipped`, `Quelle = wf2`, `SkipReason = wf2_already_synced`). A `CONTEXT_INFO` marker prevents the queue trigger from re-syncing the document (no loop).
+
+| Field | Required | Description |
+|---|---|---|
+| Area (Bereich) | Yes | Target table / area, e.g. `Auftrag_s` |
+| Document Number (Belegnummer) | Yes | Number of the target record the document is attached to |
+| SharePoint URL | Yes | Source SharePoint URL (stored under `Payload.sharePoint.mainUrl`) |
+| Email To | No* | Recipient address (`email.an`) — required when the service generates the `.eml` |
+| Allow Duplicates | No | Skip deduplication. Off by default. |
+
+**Email Fields** (collection — used to build the `.eml`):
+
+| Field | API field | Description |
+|---|---|---|
+| Date | `email.datum` | Date the mail was received (ISO 8601) |
+| From | `email.von` | Sender address |
+| HTML | `email.html` | HTML body — provide Text **or** HTML |
+| Message ID | `email.messageId` | Unique mail ID — drives deduplication |
+| Subject | `email.betreff` | Email subject |
+| Text | `email.text` | Plain text body — provide Text **or** HTML |
+
+\*When the service builds the `.eml`, `email.an` and at least one of `email.text` / `email.html` are required; otherwise the API returns `400`.
+
+**Attachments** (add one row per file):
+
+| Field | Description |
+|---|---|
+| Input Binary Field | Name of the n8n binary property to attach. If set, its content is Base64-encoded automatically and the file name / MIME type are taken from the binary metadata (unless overridden below). |
+| File Name | Attachment file name (`dateiname`) — overrides the binary file name |
+| MIME Type | Attachment MIME type — overrides the binary MIME type |
+| Content (Base64) | Base64 content (`inhaltBase64`) — used when **Input Binary Field** is empty |
+
+> **Binary handling:** the most convenient way to add attachments is to wire a node that outputs binary data (e.g. **HTTP Request**, **Read Binary File**, a SharePoint download) and reference its binary property under **Input Binary Field** — the node performs the Base64 conversion for you. The combined upload is bounded by the service limit (`MAX_UPLOAD_SIZE`, 60 MB request body ≈ 45 MiB of decoded attachments); a larger request is rejected with `403 Forbidden`.
+
+**Deduplication & `allowDuplicates`:**
+
+| `allowDuplicates` | `email.messageId` | Behaviour |
+|---|---|---|
+| off (default) | present, already seen | No `.eml`, no document, no audit entry — returns `duplicate: true` |
+| off (default) | present, new | Document is created normally |
+| off (default) | absent | No dedup check — document is created normally |
+| on | any | Dedup skipped — document is always created |
+
+The duplicate check matches on the previously stored `JSON_VALUE(Payload, '$.email.messageId')` of WF2 audit entries.
+
+#### Example workflows
+
+**WF1 — Export to SharePoint:**
+
+```text
+[Schedule/Trigger]
+      ↓
+[TaxMetall ERP · Document Sync · Check New Documents]   → leaseToken, documents[]
+      ↓ (Split / loop over documents[])
+[TaxMetall ERP · Document Sync · Download Document File] → binary "data"
+      ↓
+[Upload to SharePoint]                                  → sharePointUrl
+      ↓
+[TaxMetall ERP · Document Sync · Report Transfer Status] (success = true, sharePointUrl)
+```
+
+On an upload failure, set **Success** = `false` and pass the error message — the entry is retried and eventually marked dead.
+
+**WF2 — Import from SharePoint / mail:**
+
+```text
+[SharePoint / Mail source]
+      ↓
+[TaxMetall ERP · Document Sync · Create Document]  (bereich, belegnummer, sharePointUrl, email, attachments)
+```
+
+#### Example JSON for Create Document
+
+The node assembles the request below from its fields. The same body can also be sent directly to `POST /api/create-new-dokument`:
+
+```json
+{
+  "bereich": "Auftrag_s",
+  "belegnummer": "10523",
+  "sharePointUrl": "https://contoso.sharepoint.com/sites/erp/Freigegebene%20Dokumente/10523.eml",
+  "allowDuplicates": false,
+  "email": {
+    "messageId": "<a1b2c3@mail.example.com>",
+    "von": "kunde@example.com",
+    "an": "vertrieb@firma.de",
+    "betreff": "Bestellung 10523",
+    "datum": "2026-06-15T09:30:00",
+    "text": "Anbei die Bestellung.",
+    "html": "<p>Anbei die Bestellung.</p>"
+  },
+  "attachments": [
+    {
+      "dateiname": "bestellung.pdf",
+      "mimeType": "application/pdf",
+      "inhaltBase64": "JVBERi0xLjcZ…"
+    }
+  ]
+}
+```
+
+Successful response (new document):
+
+```json
+{ "success": true, "emlGenerated": true, "vtdt": "5EAD47A0-0D8B-40C3-A559-6F56B007AD67", "messageId": "<a1b2c3@mail.example.com>" }
+```
+
+Duplicate response (same `messageId`, `allowDuplicates` off):
+
+```json
+{ "success": true, "duplicate": true, "message": "Mail bereits verarbeitet" }
+```
+
+#### Typical errors
+
+| Status | Meaning |
+|---|---|
+| `400 Bad Request` | Missing/invalid field — e.g. `bereich`/`belegnummer` missing, no `sharePointUrl`, `email.an` or body missing, invalid Base64, or `allowDuplicates` not boolean |
+| `401 Unauthorized` | Lease token missing, wrong, or expired (download / status report) |
+| `403 Forbidden` | Request body exceeds `MAX_UPLOAD_SIZE`, or the source file is not readable |
+| `404 Not Found` | Queue entry or source file not found; or an invalid target reference for WF2 |
+| `409 Conflict` | Entry not in `in_progress`, wrong event type, or a `DMS:` reference that cannot be delivered as a local file |
+| `503 Service Unavailable` | Document sync disabled in the service config, or `dbo.SyncQueue` not present for the tenant |
 
 ---
 
