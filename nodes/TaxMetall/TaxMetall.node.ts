@@ -1175,13 +1175,21 @@ export class TaxMetall implements INodeType {
 				],
 			},
 			{
+				displayName: 'Attach All Input Binary Fields',
+				name: 'wf2AttachAllBinaries',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Whether to attach every binary property present on the input item automatically (variable number of files). When on, the Attachments list below is ignored; file name and MIME type are taken from each binary.',
+			},
+			{
 				displayName: 'Attachments',
 				name: 'wf2Attachments',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add attachment',
 				default: {},
-				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'], wf2AttachAllBinaries: [false] } },
 				description: 'Optional attachments for the generated .eml',
 				options: [
 					{
@@ -1774,36 +1782,50 @@ export class TaxMetall implements INodeType {
 						if (emailFields.text) email.text = emailFields.text;
 						if (emailFields.html) email.html = emailFields.html;
 
-						const attachmentsInput = this.getNodeParameter('wf2Attachments', i, {}) as {
-							attachment?: Array<{
-								binaryProperty?: string;
-								dateiname?: string;
-								mimeType?: string;
-								inhaltBase64?: string;
-							}>;
-						};
 						const attachments: Array<Record<string, unknown>> = [];
-						for (const att of attachmentsInput.attachment ?? []) {
-							const entry: Record<string, unknown> = {};
-							if (att.binaryProperty) {
-								const binaryMeta = this.helpers.assertBinaryData(i, att.binaryProperty);
-								const buffer = await this.helpers.getBinaryDataBuffer(i, att.binaryProperty);
-								entry.inhaltBase64 = buffer.toString('base64');
-								entry.dateiname = att.dateiname || binaryMeta.fileName || 'attachment.bin';
-								entry.mimeType = att.mimeType || binaryMeta.mimeType || 'application/octet-stream';
-							} else {
-								if (!att.inhaltBase64) {
-									throw new NodeOperationError(
-										this.getNode(),
-										'Each attachment requires either an Input Binary Field or Base64 content.',
-										{ itemIndex: i },
-									);
-								}
-								entry.inhaltBase64 = att.inhaltBase64;
-								if (att.dateiname) entry.dateiname = att.dateiname;
-								if (att.mimeType) entry.mimeType = att.mimeType;
+						const attachAllBinaries = this.getNodeParameter('wf2AttachAllBinaries', i, false) as boolean;
+						if (attachAllBinaries) {
+							const itemBinary = items[i].binary ?? {};
+							for (const propName of Object.keys(itemBinary)) {
+								const binaryMeta = itemBinary[propName];
+								const buffer = await this.helpers.getBinaryDataBuffer(i, propName);
+								attachments.push({
+									inhaltBase64: buffer.toString('base64'),
+									dateiname: binaryMeta.fileName || `${propName}.bin`,
+									mimeType: binaryMeta.mimeType || 'application/octet-stream',
+								});
 							}
-							attachments.push(entry);
+						} else {
+							const attachmentsInput = this.getNodeParameter('wf2Attachments', i, {}) as {
+								attachment?: Array<{
+									binaryProperty?: string;
+									dateiname?: string;
+									mimeType?: string;
+									inhaltBase64?: string;
+								}>;
+							};
+							for (const att of attachmentsInput.attachment ?? []) {
+								const entry: Record<string, unknown> = {};
+								if (att.binaryProperty) {
+									const binaryMeta = this.helpers.assertBinaryData(i, att.binaryProperty);
+									const buffer = await this.helpers.getBinaryDataBuffer(i, att.binaryProperty);
+									entry.inhaltBase64 = buffer.toString('base64');
+									entry.dateiname = att.dateiname || binaryMeta.fileName || 'attachment.bin';
+									entry.mimeType = att.mimeType || binaryMeta.mimeType || 'application/octet-stream';
+								} else {
+									if (!att.inhaltBase64) {
+										throw new NodeOperationError(
+											this.getNode(),
+											'Each attachment requires either an Input Binary Field or Base64 content.',
+											{ itemIndex: i },
+										);
+									}
+									entry.inhaltBase64 = att.inhaltBase64;
+									if (att.dateiname) entry.dateiname = att.dateiname;
+									if (att.mimeType) entry.mimeType = att.mimeType;
+								}
+								attachments.push(entry);
+							}
 						}
 
 						const createBody: Record<string, unknown> = {
