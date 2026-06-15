@@ -1108,7 +1108,7 @@ export class TaxMetall implements INodeType {
 				name: 'docSyncSharePointUrl',
 				type: 'string',
 				default: '',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], success: [true] } },
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], docSyncSuccess: [true] } },
 				description: 'URL of the uploaded document in SharePoint. Stored under Payload.sharePoint.mainUrl.',
 			},
 			{
@@ -1116,7 +1116,7 @@ export class TaxMetall implements INodeType {
 				name: 'docSyncError',
 				type: 'string',
 				default: '',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], success: [false] } },
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], docSyncSuccess: [false] } },
 				description: 'Error text to record for the failed transfer. Drives the retry / dead handling.',
 			},
 
