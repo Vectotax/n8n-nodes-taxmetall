@@ -19,7 +19,9 @@
             "auftrag": { "displayName": "Auftrag" },
             "eingangsrechnung": { "displayName": "Eingangsrechnung" },
             "lieferant": { "displayName": "Lieferant" },
-            "documentSync": { "displayName": "Dokument-Sync" }
+            "documentSync": { "displayName": "Dokument-Sync" },
+            "dms": { "displayName": "DMS" },
+            "statistics": { "displayName": "Statistik" }
           }
         },
         "operation": {
@@ -84,6 +86,14 @@
             "transferStatus": {
               "displayName": "Transferstatus melden",
               "action": "SharePoint-Transferstatus melden"
+            },
+            "execute": {
+              "displayName": "Ausführen",
+              "action": "Statistik-Bericht ausführen"
+            },
+            "createFile": {
+              "displayName": "Datei erstellen",
+              "action": "Datei im DMS erstellen"
             }
           }
         },
@@ -282,6 +292,159 @@
             "plz": { "displayName": "Postleitzahl" },
             "strasse": { "displayName": "Straße" }
           }
+        },
+        "articleCreateBezeichnung": {
+          "displayName": "Name",
+          "description": "Artikelname / Bezeichnung"
+        },
+        "articleCreateME": {
+          "displayName": "Mengeneinheit",
+          "description": "Mengeneinheit (z. B. Stk, m, kg)"
+        },
+        "articleCreateAdditionalFields": {
+          "displayName": "Weitere Felder",
+          "placeholder": "Feld hinzufügen",
+          "options": {
+            "artikelnr": { "displayName": "Artikelnummer", "description": "Artikelnummer. Wenn leer, wird die nächste Nummer aus dem konfigurierten Nummernkreis verwendet." },
+            "stueckliste": { "displayName": "Stückliste", "description": "0 = keine Stückliste, 1 = ist eine Stückliste" },
+            "zolltarifnr": { "displayName": "Zolltarifnummer" },
+            "zeichnungsnr": { "displayName": "Zeichnungsnummer" },
+            "fertigungskz": { "displayName": "Fertigungskennzeichen", "description": "Fertigungskennzeichen (FertigungsKz)" },
+            "artikelwerkstoff": { "displayName": "Werkstoff", "description": "Werkstoffbezeichnung (z. B. S235, 1.4301)" },
+            "vorlaeufig": { "displayName": "Vorläufig", "description": "Ob der Artikel als vorläufig markiert wird" },
+            "revisionsnr": { "displayName": "Revisionsnummer" }
+          }
+        },
+        "auftragCustId": {
+          "displayName": "Kunden-ID",
+          "description": "Kundennummer (customerid), für die der Auftrag erstellt wird"
+        },
+        "auftragPositionen": {
+          "displayName": "Positionen",
+          "placeholder": "Position hinzufügen",
+          "description": "Eine oder mehrere Auftragspositionen (Artikel mit Menge)",
+          "options": {
+            "position": {
+              "displayName": "Position",
+              "values": {
+                "articleid": { "displayName": "Artikel-ID", "description": "Numerische Artikel-ID (articleid). Alternativ unten eine Artikelnummer angeben." },
+                "artikelnr": { "displayName": "Artikelnummer", "description": "Artikelnummer als Text (artikelnr). Wird verwendet, wenn Artikel-ID = 0." },
+                "menge": { "displayName": "Menge" }
+              }
+            }
+          }
+        },
+        "auftragCreateAdditionalFields": {
+          "displayName": "Weitere Felder",
+          "placeholder": "Feld hinzufügen",
+          "options": {
+            "kalkulation": { "displayName": "Kalkulation erstellen", "description": "Ob die Stückliste eingefroren und die Kalkulation (Arbeitsplan / Material) je Position erstellt wird. Standardmäßig aus." }
+          }
+        },
+        "customerCreateName": {
+          "displayName": "Firmenname"
+        },
+        "customerCreateAdditionalFields": {
+          "displayName": "Weitere Felder",
+          "placeholder": "Feld hinzufügen",
+          "options": {
+            "ort": { "displayName": "Ort" },
+            "staat": { "displayName": "Land" },
+            "emailadresse": { "displayName": "E-Mail" },
+            "isolkz": { "displayName": "ISO-Ländercode", "description": "Zweistelliger ISO-Ländercode (z. B. DE, AT, CH)" },
+            "namenzusatz": { "displayName": "Namenszusatz" },
+            "telefon": { "displayName": "Telefon" },
+            "plz": { "displayName": "Postleitzahl" },
+            "strasse": { "displayName": "Straße" },
+            "internetadresse": { "displayName": "Webseite" }
+          }
+        },
+        "lieferantCreateName": {
+          "displayName": "Firmenname"
+        },
+        "lieferantCreateAdditionalFields": {
+          "displayName": "Weitere Felder",
+          "placeholder": "Feld hinzufügen",
+          "options": {
+            "ort": { "displayName": "Ort" },
+            "staat": { "displayName": "Land" },
+            "emailadresse": { "displayName": "E-Mail" },
+            "isolkz": { "displayName": "ISO-Ländercode", "description": "Zweistelliger ISO-Ländercode (z. B. DE, AT, CH)" },
+            "namenzusatz": { "displayName": "Namenszusatz" },
+            "telefon": { "displayName": "Telefon" },
+            "plz": { "displayName": "Postleitzahl" },
+            "strasse": { "displayName": "Straße" },
+            "internetadresse": { "displayName": "Webseite" }
+          }
+        },
+        "akquiseId": {
+          "displayName": "Akquise-ID",
+          "description": "Interne Kontaktnummer (KontaktNr)"
+        },
+        "akquiseName": {
+          "displayName": "Name",
+          "description": "Suche nach Teilübereinstimmung in Firmen- oder Kontaktname"
+        },
+        "akquiseVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum (Erstkontaktdatum) im Format JJJJ-MM-TT"
+        },
+        "akquiseBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum (Erstkontaktdatum) im Format JJJJ-MM-TT"
+        },
+        "statisticId": {
+          "displayName": "Statistik / Bericht",
+          "description": "Bericht aus der Liste auswählen — die Beschreibung zeigt, welche Parameter benötigt werden. Aus der Liste wählen oder per Expression eine ID angeben."
+        },
+        "statDatumVon": {
+          "displayName": "Datum von",
+          "description": "Startdatum des Berichtszeitraums (SQL-Parameter: DatumVon)"
+        },
+        "statDatumBis": {
+          "displayName": "Datum bis",
+          "description": "Enddatum des Berichtszeitraums (SQL-Parameter: DatumBis)"
+        },
+        "statVergleichVon": {
+          "displayName": "Vergleich von",
+          "description": "Startdatum eines Vergleichszeitraums (SQL-Parameter: VergleichVon)"
+        },
+        "statVergleichBis": {
+          "displayName": "Vergleich bis",
+          "description": "Enddatum eines Vergleichszeitraums (SQL-Parameter: VergleichBis)"
+        },
+        "statWeitereParameter": {
+          "displayName": "Weitere Parameter",
+          "placeholder": "Parameter hinzufügen",
+          "description": "Optionale Filterparameter — welche erforderlich sind, zeigt die Berichtsbeschreibung oben",
+          "options": {
+            "ArtikelGruppe": { "displayName": "Artikelgruppe", "description": "SQL-Parameter: ArtikelGruppe" },
+            "Artikel": { "displayName": "Artikelnr.", "description": "SQL-Parameter: Artikel" },
+            "GeschBereich": { "displayName": "Geschäftsbereich", "description": "SQL-Parameter: GeschBereich" },
+            "Kunden": { "displayName": "Kundennr.", "description": "SQL-Parameter: Kunden" },
+            "Mitarbeiter": { "displayName": "Mitarbeiter", "description": "SQL-Parameter: Mitarbeiter" },
+            "Angebot": { "displayName": "Angebotsnr.", "description": "SQL-Parameter: Angebot" },
+            "AngebotsPos": { "displayName": "Angebotsposition", "description": "SQL-Parameter: AngebotsPos" },
+            "Auftrag": { "displayName": "Auftragsnr.", "description": "SQL-Parameter: Auftrag" },
+            "AuftragsPos": { "displayName": "Auftragsposition", "description": "SQL-Parameter: AuftragsPos" },
+            "AuftragsArt": { "displayName": "Auftragsart", "description": "SQL-Parameter: AuftragsArt" },
+            "Projekt": { "displayName": "Projektnr.", "description": "SQL-Parameter: Projekt" },
+            "Bestellung": { "displayName": "Bestellnr.", "description": "SQL-Parameter: Bestellung" },
+            "BestellPos": { "displayName": "Bestellposition", "description": "SQL-Parameter: BestellPos" },
+            "Lieferanten": { "displayName": "Lieferantennr.", "description": "SQL-Parameter: Lieferanten" },
+            "WertebereichVon": { "displayName": "Wertebereich von", "description": "SQL-Parameter: WertebereichVon" },
+            "WertebereichBis": { "displayName": "Wertebereich bis", "description": "SQL-Parameter: WertebereichBis" },
+            "Variable1": { "displayName": "Variable 1", "description": "SQL-Parameter: Variable1" },
+            "Lagerort": { "displayName": "Lagerort", "description": "SQL-Parameter: Lagerort" }
+          }
+        },
+        "dmsData": {
+          "displayName": "Daten (JSON)",
+          "description": "Metadaten-Objekt — Struktur durch eure TaxDMS-Konfiguration definiert"
+        },
+        "dmsBinaryProperty": {
+          "displayName": "Datei (Binär)",
+          "description": "Name der n8n-Binärproperty, die die Datei enthält (z. B. \"data\")"
         },
         "docSyncLimit": {
           "displayName": "Limit",
