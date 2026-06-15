@@ -333,11 +333,25 @@ WF2: creates a document in TaxMetall from mail data. When no existing file path 
 
 | Field | Required | Description |
 |---|---|---|
-| Area (Bereich) | Yes | Target table / area, e.g. `Auftrag_s` |
-| Document Number (Belegnummer) | Yes | Number of the target record the document is attached to |
+| Area (Bereich) | Yes | Target area, chosen from a dropdown. The friendly name (e.g. **Order (Auftrag)**) maps to the TaxMetall table name sent to the API (`Auftrag_s`). Switch to an expression for a dynamic value. |
+| Document Number (Belegnummer) | Yes | Number of the target record. For *Position* areas use `DocumentNumber.Position` (e.g. `10523.1`). |
 | SharePoint URL | Yes | Source SharePoint URL (stored under `Payload.sharePoint.mainUrl`) |
 | Email To | No* | Recipient address (`email.an`) — required when the service generates the `.eml` |
+| Attach All Input Binary Fields | No | Attach **every** binary property on the input item automatically (variable number of files, e.g. all attachments from a Gmail/IMAP trigger). When on, the manual Attachments list is hidden and ignored. |
 | Allow Duplicates | No | Skip deduplication. Off by default. |
+
+**Area (Bereich) mapping** — the dropdown sends these table names:
+
+| Dropdown | API value | Dropdown | API value |
+|---|---|---|---|
+| Order (Auftrag) | `Auftrag_s` | Order Position | `Auftragpos_s` |
+| Offer (Angebot) | `Angebot_s` | Offer Position | `Angebotpos_s` |
+| Invoice (Rechnung) | `Rechnung_s` | Invoice Position | `Rechnungpos_s` |
+| Delivery Note (Lieferschein) | `Lieferschein_s` | Delivery Note Position | `Lieferscheinpos_s` |
+| Purchase Order (Bestellung) | `Bestellung_s` | Purchase Order Position | `Bestellungpos_s` |
+| Inquiry (Anfrage) | `Anfrage_s` | Project (Projekt) | `Projekt` |
+| Customer (Kunde) | `Kunden_s` | Supplier (Lieferant) | `Liefer_s` |
+| Article (Artikel) | `Artikel_s` | Purchase Invoice (ER) | `ER` |
 
 **Email Fields** (collection — used to build the `.eml`):
 
