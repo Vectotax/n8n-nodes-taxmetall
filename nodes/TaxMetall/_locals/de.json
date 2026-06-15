@@ -18,7 +18,8 @@
             "offer": { "displayName": "Angebot" },
             "auftrag": { "displayName": "Auftrag" },
             "eingangsrechnung": { "displayName": "Eingangsrechnung" },
-            "lieferant": { "displayName": "Lieferant" }
+            "lieferant": { "displayName": "Lieferant" },
+            "documentSync": { "displayName": "Dokument-Sync" }
           }
         },
         "operation": {
@@ -67,6 +68,22 @@
             "getStatus": {
               "displayName": "Status abrufen",
               "action": "Status abrufen"
+            },
+            "checkNew": {
+              "displayName": "Neue Dokumente abrufen",
+              "action": "Neue Dokumente aus der Warteschlange beanspruchen"
+            },
+            "createNew": {
+              "displayName": "Dokument erstellen",
+              "action": "Dokument aus Maildaten in TaxMetall erstellen"
+            },
+            "downloadFile": {
+              "displayName": "Dokumentdatei herunterladen",
+              "action": "Beanspruchte Dokumentdatei herunterladen"
+            },
+            "transferStatus": {
+              "displayName": "Transferstatus melden",
+              "action": "SharePoint-Transferstatus melden"
             }
           }
         },
@@ -265,6 +282,135 @@
             "plz": { "displayName": "Postleitzahl" },
             "strasse": { "displayName": "Straße" }
           }
+        },
+        "docSyncLimit": {
+          "displayName": "Limit",
+          "description": "Maximale Anzahl Dokumente, die pro Aufruf aus der Warteschlange beansprucht werden. Der Dienst begrenzt dies auf sein konfiguriertes Maximum."
+        },
+        "docSyncId": {
+          "displayName": "Sync-ID",
+          "description": "Die syncId des Warteschlangeneintrags (aus 'Neue Dokumente abrufen')"
+        },
+        "docSyncLeaseToken": {
+          "displayName": "Lease-Token",
+          "description": "Der leaseToken aus 'Neue Dokumente abrufen'. Er autorisiert den Zugriff auf den beanspruchten Eintrag."
+        },
+        "docSyncBinaryProperty": {
+          "displayName": "Ausgabedatei in Feld ablegen",
+          "description": "Name der Binärproperty, in die die heruntergeladene Datei geschrieben wird"
+        },
+        "docSyncSuccess": {
+          "displayName": "Erfolg",
+          "description": "Ob der SharePoint-Upload erfolgreich war. Bei 'false' wird der Eintrag erneut versucht oder nach dem konfigurierten Maximum als 'dead' markiert."
+        },
+        "docSyncSharePointUrl": {
+          "displayName": "SharePoint-URL",
+          "description": "URL des hochgeladenen Dokuments in SharePoint. Wird unter Payload.sharePoint.mainUrl gespeichert."
+        },
+        "docSyncError": {
+          "displayName": "Fehlermeldung",
+          "description": "Fehlertext, der für den fehlgeschlagenen Transfer gespeichert wird. Steuert das Retry-/Dead-Verhalten."
+        },
+        "wf2Bereich": {
+          "displayName": "Bereich",
+          "description": "Zielbereich, an den das Dokument angehängt wird. Der an die API gesendete Wert ist der TaxMetall-Tabellenname (z. B. Auftrag → Auftrag_s). Für dynamische Werte auf Expression umschalten.",
+          "options": {
+            "Artikel_s": { "displayName": "Artikel" },
+            "Kunden_s": { "displayName": "Kunde" },
+            "Lieferschein_s": { "displayName": "Lieferschein" },
+            "Lieferscheinpos_s": { "displayName": "Lieferscheinposition" },
+            "Anfrage_s": { "displayName": "Anfrage" },
+            "Rechnung_s": { "displayName": "Rechnung" },
+            "Rechnungpos_s": { "displayName": "Rechnungsposition" },
+            "Angebot_s": { "displayName": "Angebot" },
+            "Angebotpos_s": { "displayName": "Angebotsposition" },
+            "Auftrag_s": { "displayName": "Auftrag" },
+            "Auftragpos_s": { "displayName": "Auftragsposition" },
+            "Projekt": { "displayName": "Projekt" },
+            "ER": { "displayName": "Eingangsrechnung" },
+            "Bestellung_s": { "displayName": "Bestellung" },
+            "Bestellungpos_s": { "displayName": "Bestellposition" },
+            "Liefer_s": { "displayName": "Lieferant" }
+          }
+        },
+        "wf2Belegnummer": {
+          "displayName": "Belegnummer",
+          "description": "Nummer des Zieldatensatzes, an den das Dokument angehängt wird. Für Positions-Bereiche das Format Belegnummer.Position verwenden (z. B. 10523.1)."
+        },
+        "wf2SharePointUrl": {
+          "displayName": "SharePoint-URL",
+          "description": "Quell-SharePoint-URL des Dokuments. Wird unter Payload.sharePoint.mainUrl gespeichert."
+        },
+        "wf2EmailAn": {
+          "displayName": "E-Mail An",
+          "description": "Empfängeradresse für das erzeugte .eml (email.an). Erforderlich, wenn der Dienst das .eml erzeugt."
+        },
+        "wf2EmailFields": {
+          "displayName": "E-Mail-Felder",
+          "placeholder": "E-Mail-Feld hinzufügen",
+          "description": "Weitere Felder der Quell-E-Mail zum Aufbau des .eml",
+          "options": {
+            "datum": {
+              "displayName": "Datum",
+              "description": "Empfangsdatum der Mail (email.datum), ISO 8601"
+            },
+            "von": {
+              "displayName": "Von",
+              "description": "Absenderadresse (email.von)"
+            },
+            "html": {
+              "displayName": "HTML",
+              "description": "HTML-Inhalt (email.html). Text oder HTML angeben."
+            },
+            "messageId": {
+              "displayName": "Message-ID",
+              "description": "Eindeutige Message-ID (email.messageId). Wird für die Deduplizierung verwendet."
+            },
+            "betreff": {
+              "displayName": "Betreff",
+              "description": "E-Mail-Betreff (email.betreff)"
+            },
+            "text": {
+              "displayName": "Text",
+              "description": "Klartext-Inhalt (email.text). Text oder HTML angeben."
+            }
+          }
+        },
+        "wf2AttachAllBinaries": {
+          "displayName": "Alle Binärfelder anhängen",
+          "description": "Ob automatisch jede am Eingangs-Item vorhandene Binärproperty angehängt wird (variable Dateianzahl, z. B. alle Anhänge eines Gmail-/IMAP-Triggers). Wenn aktiv, wird die manuelle Anhangsliste ausgeblendet und ignoriert."
+        },
+        "wf2Attachments": {
+          "displayName": "Anhänge",
+          "placeholder": "Anhang hinzufügen",
+          "description": "Optionale Anhänge für das erzeugte .eml",
+          "options": {
+            "attachment": {
+              "displayName": "Anhang",
+              "values": {
+                "binaryProperty": {
+                  "displayName": "Eingangs-Binärfeld",
+                  "description": "Name der anzuhängenden n8n-Binärproperty. Wenn gesetzt, wird der Inhalt automatisch Base64-kodiert und Dateiname / MIME-Typ aus den Metadaten übernommen (sofern unten nicht überschrieben)."
+                },
+                "dateiname": {
+                  "displayName": "Dateiname",
+                  "description": "Dateiname des Anhangs (dateiname). Überschreibt den Binär-Dateinamen."
+                },
+                "mimeType": {
+                  "displayName": "MIME-Typ",
+                  "description": "MIME-Typ des Anhangs. Überschreibt den Binär-MIME-Typ."
+                },
+                "inhaltBase64": {
+                  "displayName": "Inhalt (Base64)",
+                  "description": "Base64-kodierter Inhalt (inhaltBase64). Wird verwendet, wenn kein Eingangs-Binärfeld gesetzt ist."
+                }
+              }
+            }
+          }
+        },
+        "wf2AllowDuplicates": {
+          "displayName": "Duplikate zulassen",
+          "description": "Ob die Deduplizierung übersprungen wird. Wenn aus (Standard), wird ein Dokument mit bereits gesehener email.messageId nicht erneut angelegt und duplicate=true zurückgegeben."
         }
       }
     }
