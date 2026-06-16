@@ -75,6 +75,10 @@
               "displayName": "Neue Dokumente abrufen",
               "action": "Neue Dokumente aus der Warteschlange beanspruchen"
             },
+            "claimAndDownload": {
+              "displayName": "Neue Dokumente abrufen & herunterladen",
+              "action": "Neue Dokumente in einem Schritt beanspruchen und herunterladen"
+            },
             "createNew": {
               "displayName": "Dokument erstellen",
               "action": "Dokument aus Maildaten in TaxMetall erstellen"

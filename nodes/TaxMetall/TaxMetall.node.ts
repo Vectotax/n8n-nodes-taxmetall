@@ -64,6 +64,7 @@ export class TaxMetall implements INodeType {
 				getStatus: 'Get Status',
 				createFile: 'Create File',
 				checkNew: 'Check New Documents',
+				claimAndDownload: 'Check & Download New Documents',
 				downloadFile: 'Download File',
 				transferStatus: 'Transfer Status',
 				createNew: 'Create Document',
@@ -285,6 +286,7 @@ export class TaxMetall implements INodeType {
 				type: 'options',
 				displayOptions: { show: { resource: ['documentSync'] } },
 				options: [
+					{ name: 'Check & Download New Documents', value: 'claimAndDownload', action: 'Claim and download new documents in one step' },
 					{ name: 'Check New Documents', value: 'checkNew', action: 'Claim new documents from the sync queue' },
 					{ name: 'Create Document', value: 'createNew', action: 'Create a document from mail data in tax metall' },
 					{ name: 'Download Document File', value: 'downloadFile', action: 'Download a claimed document file' },
@@ -1058,7 +1060,7 @@ export class TaxMetall implements INodeType {
 				type: 'number',
 				typeOptions: { minValue: 1 },
 				default: 50,
-				displayOptions: { show: { resource: ['documentSync'], operation: ['checkNew'] } },
+				displayOptions: { show: { resource: ['documentSync'], operation: ['checkNew', 'claimAndDownload'] } },
 				description: 'Max number of documents to claim from the queue in one call. The service caps this at its configured maximum.',
 			},
 
@@ -1090,7 +1092,7 @@ export class TaxMetall implements INodeType {
 				type: 'string',
 				required: true,
 				default: 'data',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile'] } },
+				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'claimAndDownload'] } },
 				description: 'Name of the binary property to write the downloaded file to',
 			},
 
@@ -1731,6 +1733,84 @@ export class TaxMetall implements INodeType {
 							json: true,
 							...tlsOption,
 						});
+
+					} else if (operation === 'claimAndDownload') {
+						const binaryPropertyName = this.getNodeParameter('docSyncBinaryProperty', i, 'data') as string;
+
+						// 1) Claim a batch — the service only returns relevant (pending) entries
+						//    and assigns one batch-wide leaseToken.
+						const claimBody: Record<string, unknown> = {};
+						const claimLimit = this.getNodeParameter('docSyncLimit', i) as number;
+						if (claimLimit && claimLimit > 0) claimBody.limit = claimLimit;
+						const claim = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/check-new-documents`,
+							body: claimBody,
+							headers,
+							json: true,
+							...tlsOption,
+						})) as { leaseToken: string; documents?: Array<Record<string, unknown>> };
+
+						const leaseToken = claim.leaseToken;
+						const documents = Array.isArray(claim.documents) ? claim.documents : [];
+
+						// 2) Download the file for each claimed document (same batch-wide leaseToken).
+						for (const doc of documents) {
+							const docSyncId = doc.syncId as number;
+							const hasFile = doc.eventType === 'document.created' && typeof doc.downloadUrl === 'string';
+
+							if (!hasFile) {
+								// e.g. document.deleted — no file to fetch, pass metadata through
+								returnData.push({ json: { ...doc, leaseToken }, pairedItem: { item: i } });
+								continue;
+							}
+
+							try {
+								const fileResponse = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+									method: 'GET',
+									url: `${baseUrl}/api/document-file`,
+									qs: { syncId: docSyncId, token: leaseToken },
+									headers,
+									encoding: 'arraybuffer',
+									returnFullResponse: true,
+									...tlsOption,
+								})) as { body: unknown; headers: Record<string, string> };
+
+								const disposition = fileResponse.headers['content-disposition'] ?? '';
+								const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+								const fileName = fileNameMatch
+									? decodeURIComponent(fileNameMatch[1].trim())
+									: ((doc.dateiname as string)?.split(/[\\/]/).pop() || `document-${docSyncId}`);
+								const mimeType = (fileResponse.headers['content-type'] ?? 'application/octet-stream')
+									.split(';')[0]
+									.trim();
+								const binaryData = await this.helpers.prepareBinaryData(
+									fileResponse.body as Parameters<typeof this.helpers.prepareBinaryData>[0],
+									fileName,
+									mimeType,
+								);
+
+								returnData.push({
+									json: { ...doc, leaseToken, fileName, mimeType },
+									binary: { [binaryPropertyName]: binaryData },
+									pairedItem: { item: i },
+								});
+							} catch (downloadError) {
+								// A file can vanish or be skipped server-side between claim and download
+								// (404/409/403). Do not abort the whole batch — record and continue.
+								const err = downloadError as { httpCode?: string | number; message?: string };
+								returnData.push({
+									json: {
+										...doc,
+										leaseToken,
+										downloadError: err.message ?? String(downloadError),
+										httpCode: err.httpCode,
+									},
+									pairedItem: { item: i },
+								});
+							}
+						}
+						continue;
 
 					} else if (operation === 'downloadFile') {
 						const syncId = this.getNodeParameter('docSyncId', i) as string;

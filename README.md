@@ -313,6 +313,23 @@ Downloads the file of a single claimed entry as **binary data** (WF1, step 2). T
 
 The downloaded file is placed in the chosen binary property, ready for an upload node (e.g. **HTTP Request** or a **Microsoft SharePoint** node). The item JSON also carries `syncId`, `leaseToken`, `fileName` and `mimeType`.
 
+#### Check & Download New Documents
+
+Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and, using the batch-wide lease token, downloads the file for each `document.created` entry — so you no longer need a Split/loop + a separate download node.
+
+| Field | Required | Description |
+|---|---|---|
+| Limit | No | Max number of documents to claim in one call (default `50`). The service caps this at its configured maximum. |
+| Put Output File in Field | Yes | Name of the binary property to write each file to (default `data`) |
+
+**Output:** one item per claimed document.
+
+- `document.created` entries: item JSON carries the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
+- Non-file events (e.g. `document.deleted`): metadata only, no binary.
+- If a single file fails to download (it was removed or skipped server-side between claim and download), that item carries `downloadError` and `httpCode` instead of a binary; the rest of the batch still comes through.
+
+Because the `leaseToken` and `syncId` are on every item, a downstream **Report SharePoint Transfer Status** can acknowledge each entry as usual. Use the low-level **Check New Documents** / **Download Document File** operations only when you need full manual control over the claim/download split.
+
 #### Report SharePoint Transfer Status
 
 Reports the upload result back to the service (WF1, step 4).
@@ -390,7 +407,19 @@ The duplicate check matches on the previously stored `JSON_VALUE(Payload, '$.ema
 
 #### Example workflows
 
-**WF1 — Export to SharePoint:**
+**WF1 — Export to SharePoint (combined, recommended):**
+
+```text
+[Schedule/Trigger]
+      ↓
+[TaxMetall ERP · Document Sync · Check & Download New Documents] → one item per document, binary "data"
+      ↓
+[Upload to SharePoint]                                          → sharePointUrl
+      ↓
+[TaxMetall ERP · Document Sync · Report Transfer Status]        (success = true, sharePointUrl)
+```
+
+**WF1 — Export to SharePoint (manual claim/download split):**
 
 ```text
 [Schedule/Trigger]
