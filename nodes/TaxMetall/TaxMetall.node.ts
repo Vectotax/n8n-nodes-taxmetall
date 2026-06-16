@@ -1753,15 +1753,29 @@ export class TaxMetall implements INodeType {
 
 						const leaseToken = claim.leaseToken;
 						const documents = Array.isArray(claim.documents) ? claim.documents : [];
+						const count = documents.length;
 
-						// 2) Download the file for each claimed document (same batch-wide leaseToken).
-						for (const doc of documents) {
+						// 2) Nothing claimed → emit one summary item so downstream always gets feedback.
+						if (count === 0) {
+							returnData.push({
+								json: { success: false, count: 0, description: 'No new documents found' },
+								pairedItem: { item: i },
+							});
+							continue;
+						}
+
+						// 3) Download the file for each claimed document (same batch-wide leaseToken).
+						for (let d = 0; d < documents.length; d++) {
+							const doc = documents[d];
 							const docSyncId = doc.syncId as number;
 							const hasFile = doc.eventType === 'document.created' && typeof doc.downloadUrl === 'string';
 
 							if (!hasFile) {
 								// e.g. document.deleted — no file to fetch, pass metadata through
-								returnData.push({ json: { ...doc, leaseToken }, pairedItem: { item: i } });
+								returnData.push({
+									json: { success: true, count, index: d, ...doc, leaseToken },
+									pairedItem: { item: i },
+								});
 								continue;
 							}
 
@@ -1791,7 +1805,7 @@ export class TaxMetall implements INodeType {
 								);
 
 								returnData.push({
-									json: { ...doc, leaseToken, fileName, mimeType },
+									json: { success: true, count, index: d, ...doc, leaseToken, fileName, mimeType },
 									binary: { [binaryPropertyName]: binaryData },
 									pairedItem: { item: i },
 								});
@@ -1801,6 +1815,9 @@ export class TaxMetall implements INodeType {
 								const err = downloadError as { httpCode?: string | number; message?: string };
 								returnData.push({
 									json: {
+										success: true,
+										count,
+										index: d,
 										...doc,
 										leaseToken,
 										downloadError: err.message ?? String(downloadError),

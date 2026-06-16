@@ -322,13 +322,17 @@ Combines **Check New Documents** and **Download Document File** into a single st
 | Limit | No | Max number of documents to claim in one call (default `50`). The service caps this at its configured maximum. |
 | Put Output File in Field | Yes | Name of the binary property to write each file to (default `data`) |
 
-**Output:** one item per claimed document.
+**Output:** one item per claimed document — and exactly one summary item when nothing was found, so the node always returns something to branch on.
 
-- `document.created` entries: item JSON carries the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
-- Non-file events (e.g. `document.deleted`): metadata only, no binary.
-- If a single file fails to download (it was removed or skipped server-side between claim and download), that item carries `downloadError` and `httpCode` instead of a binary; the rest of the batch still comes through.
+- **Nothing found:** a single item `{ "success": false, "count": 0, "description": "No new documents found" }` (no binary). Use this to drive a "nothing to do" branch.
+- **Documents found:** one item per claimed document. Every item carries `success: true`, `count` (number of documents in the batch) and `index` (0-based position), in addition to:
+  - `document.created` entries: the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
+  - Non-file events (e.g. `document.deleted`): metadata only, no binary.
+  - If a single file fails to download (it was removed or skipped server-side between claim and download), that item carries `downloadError` and `httpCode` instead of a binary; the rest of the batch still comes through.
 
-Because the `leaseToken` and `syncId` are on every item, a downstream **Report SharePoint Transfer Status** can acknowledge each entry as usual. Use the low-level **Check New Documents** / **Download Document File** operations only when you need full manual control over the claim/download split.
+Tip: filter downstream on `{{ $json.success }}` to separate the "found" items from the empty-result item.
+
+Because the `leaseToken` and `syncId` are on every found item, a downstream **Report SharePoint Transfer Status** can acknowledge each entry as usual. Use the low-level **Check New Documents** / **Download Document File** operations only when you need full manual control over the claim/download split.
 
 #### Report SharePoint Transfer Status
 
@@ -346,7 +350,7 @@ Reports the upload result back to the service (WF1, step 4).
 
 #### Create Document
 
-WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Status = skipped`, `Quelle = wf2`, `SkipReason = wf2_already_synced`). A `CONTEXT_INFO` marker prevents the queue trigger from re-syncing the document (no loop).
+WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Status = skipped`, `Quelle = API:create-new-dokument`, `SkipReason = already_synced`). A `CONTEXT_INFO` marker prevents the queue trigger from re-syncing the document (no loop).
 
 | Field | Required | Description |
 |---|---|---|
