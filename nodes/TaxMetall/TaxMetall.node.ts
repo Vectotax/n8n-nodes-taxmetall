@@ -1100,26 +1100,26 @@ export class TaxMetall implements INodeType {
 			{
 				displayName: 'Success',
 				name: 'docSyncSuccess',
-				type: 'boolean',
-				default: true,
+				type: 'string',
+				default: 'true',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
-				description: 'Whether the SharePoint upload succeeded. On false the entry is retried, or marked dead after the configured maximum.',
+				description: 'Whether the SharePoint transfer succeeded. This is a text field so you can pass the result from a previous step via an expression. Truthy values (case-insensitive): true, 1, yes, success; anything else counts as failed. On failure the entry stays in the queue and is retried on the next poll.',
 			},
 			{
 				displayName: 'SharePoint URL',
 				name: 'docSyncSharePointUrl',
 				type: 'string',
 				default: '',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], docSyncSuccess: [true] } },
-				description: 'URL of the uploaded document in SharePoint. Stored under Payload.sharePoint.mainUrl.',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
+				description: 'URL of the uploaded document in SharePoint (used when Success is true). Stored under Payload.sharePoint.mainUrl. Required for CREATE/EDIT uploads; leave empty for DELETE acknowledgements.',
 			},
 			{
 				displayName: 'Error Message',
 				name: 'docSyncError',
 				type: 'string',
 				default: '',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'], docSyncSuccess: [false] } },
-				description: 'Error text to record for the failed transfer. Drives the retry / dead handling.',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
+				description: 'Error text to record for the failed transfer (used when Success is false). The service logs it; the entry is retried unconditionally on the next poll.',
 			},
 
 			// Create Document (WF2)
@@ -1868,7 +1868,14 @@ export class TaxMetall implements INodeType {
 					} else if (operation === 'transferStatus') {
 						const syncId = this.getNodeParameter('docSyncId', i) as string;
 						const leaseToken = this.getNodeParameter('docSyncLeaseToken', i) as string;
-						const success = this.getNodeParameter('docSyncSuccess', i) as boolean;
+						// "Success" is a string field so the value can be passed in from an
+						// upstream step (e.g. {{ $json.success }}); coerce it to a real boolean.
+						const successRaw = this.getNodeParameter('docSyncSuccess', i) as unknown;
+						const success =
+							successRaw === true ||
+							successRaw === 1 ||
+							(typeof successRaw === 'string' &&
+								['true', '1', 'yes', 'success'].includes(successRaw.trim().toLowerCase()));
 						const transferBody: Record<string, unknown> = { syncId, leaseToken, success };
 						if (success) {
 							const sharePointUrl = this.getNodeParameter('docSyncSharePointUrl', i, '') as string;
