@@ -1768,10 +1768,12 @@ export class TaxMetall implements INodeType {
 						for (let d = 0; d < documents.length; d++) {
 							const doc = documents[d];
 							const docSyncId = doc.syncId as number;
-							const hasFile = doc.eventType === 'document.created' && typeof doc.downloadUrl === 'string';
+							// The service exposes a downloadUrl only for fetchable items (CREATE/EDIT).
+							// DELETE items carry a sharePointUrl instead and have no file to download.
+							const hasFile = typeof doc.downloadUrl === 'string';
 
 							if (!hasFile) {
-								// e.g. document.deleted — no file to fetch, pass metadata through
+								// e.g. a DELETE event — no file to fetch, pass metadata through
 								returnData.push({
 									json: { success: true, count, index: d, ...doc, leaseToken },
 									pairedItem: { item: i },

@@ -273,7 +273,7 @@ Uploads a binary file together with a metadata object to TaxDMS via the `/api/cr
 
 ### Document Sync (SharePoint WF1 / WF2)
 
-Connects the TaxMetall document pocket (Dokutasche) with SharePoint through the TaxMetall sync queue (`SyncQueue`). It implements two workflows:
+Connects the TaxMetall document pocket (Dokutasche) with SharePoint through the TaxMetall document-sync work queue (`APIEventTrigger` / `APIEventDetail`). It implements two workflows:
 
 - **WF1 — Export** (TaxMetall → SharePoint): claim newly created documents from the queue, download each file, upload it to SharePoint, then report the result back so the entry is closed or retried.
 - **WF2 — Import** (SharePoint / mail → TaxMetall): create a document (typically an `.eml` built by the service) in TaxMetall and write a closing audit entry, with optional deduplication by mail message ID.
@@ -282,7 +282,7 @@ The service stores the resulting SharePoint URL under `Payload.sharePoint.mainUr
 
 #### Check New Documents
 
-Claims up to **Limit** pending entries from the sync queue and returns a **lease token** plus the list of documents to process (WF1, step 1). Each call generates a fresh lease token; only the holder of that token may download a claimed file or report its status, and the lease expires after the service-configured number of seconds.
+Claims up to **Limit** pending entries from the work queue and returns a **lease token** plus the list of documents to process (WF1, step 1). Each call generates a fresh lease token; only the holder of that token may download a claimed file or report its status, and the lease expires after the service-configured number of seconds.
 
 | Field | Required | Description |
 |---|---|---|
@@ -293,13 +293,18 @@ Important response fields:
 | Field | Description |
 |---|---|
 | `leaseToken` | Token authorizing access to all claimed entries in this batch |
+| `busy` | `true` when another batch is still being processed; then `documents[]` is empty and nothing is claimed — simply poll again later |
 | `documents[]` | Entries ready for processing |
 | `documents[].syncId` | Queue entry ID — needed for download and status report |
-| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…&token=…` |
-| `documents[].eventType` | Event type, e.g. `document.created` |
-| `documents[].bereich` / `belegNr` | Target area and document number |
+| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…&token=…` (CREATE/EDIT only) |
+| `documents[].eventTyp` | Event type as integer: `1` = CREATE, `2` = EDIT, `3` = DELETE |
+| `documents[].aktion` | The same event as text: `CREATE`, `EDIT` or `DELETE` |
+| `documents[].belegTyp` / `belegNr` | Business document type (e.g. `Auftrag`, `Rechnung`, `Angebot`) and document number — the internal table name is not exposed |
 | `documents[].dateiname` | Source file path/name |
-| `skipped[]` | Entries the service skipped (e.g. DMS reference, file not found) |
+| `documents[].sharePointUrl` | For DELETE events only: SharePoint URL of the previously uploaded file, so it can be removed from SharePoint. Correlated by file path (newest match wins). `null` if no prior upload is found. |
+| `skipped[]` | Entries the service skipped this batch — `dms_reference`, `file_not_found`, `file_unreadable`, or `superseded` (an older event for the same file path, collapsed because only the latest state matters; see Coalescing below) |
+
+**Coalescing (per file path):** Between two polls the same file can be created/deleted several times (e.g. created → deleted → created). For SharePoint only the **final state** matters. On each claim the service therefore keeps **only the latest event per file path** (highest `syncId`) and marks the earlier ones `skipped` / `superseded`. Combined with the delete correlation this means: a created→deleted pair where nothing was ever uploaded collapses to a no-op (the kept DELETE event returns `sharePointUrl: null`), while created→deleted→created collapses to a single upload of the latest version.
 
 #### Download Document File
 
@@ -315,7 +320,7 @@ The downloaded file is placed in the chosen binary property, ready for an upload
 
 #### Check & Download New Documents
 
-Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and, using the batch-wide lease token, downloads the file for each `document.created` entry — so you no longer need a Split/loop + a separate download node.
+Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and, using the batch-wide lease token, downloads the file for each CREATE/EDIT entry (those with a `downloadUrl`) — so you no longer need a Split/loop + a separate download node.
 
 | Field | Required | Description |
 |---|---|---|
@@ -326,8 +331,8 @@ Combines **Check New Documents** and **Download Document File** into a single st
 
 - **Nothing found:** a single item `{ "success": false, "count": 0, "description": "No new documents found" }` (no binary). Use this to drive a "nothing to do" branch.
 - **Documents found:** one item per claimed document. Every item carries `success: true`, `count` (number of documents in the batch) and `index` (0-based position), in addition to:
-  - `document.created` entries: the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
-  - Non-file events (e.g. `document.deleted`): metadata only, no binary.
+  - CREATE/EDIT entries (with a file): the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
+  - Non-file events (e.g. DELETE): metadata only, no binary.
   - If a single file fails to download (it was removed or skipped server-side between claim and download), that item carries `downloadError` and `httpCode` instead of a binary; the rest of the batch still comes through.
 
 Tip: filter downstream on `{{ $json.success }}` to separate the "found" items from the empty-result item.
@@ -343,14 +348,14 @@ Reports the upload result back to the service (WF1, step 4).
 | Sync ID | Yes | `syncId` of the entry |
 | Lease Token | Yes | `leaseToken` from the same batch |
 | Success | Yes | `true` = synced successfully, `false` = transfer failed |
-| SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`) |
+| SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`). **Required only for CREATE/EDIT (upload).** For DELETE acknowledgements leave it empty — there is no new URL. |
 | Error Message | No | Shown when **Success** is off — error text recorded for the failed transfer |
 
-**Retry / Dead handling:** on `success = false` the entry is scheduled for a retry after the service-configured interval. Once the configured maximum number of attempts is exceeded, the entry is marked **dead**. Dead entries are not retried automatically but can be reactivated deliberately in the database.
+**Retry handling:** on `success = false` the service removes the in-flight entry but **keeps the work-queue row**, so the document is retried on the next poll — **unconditionally and without limit** (there is no retry counter and no `dead` state). The failure is recorded only in the service log.
 
 #### Create Document
 
-WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Status = skipped`, `Quelle = API:create-new-dokument`, `SkipReason = already_synced`). A `CONTEXT_INFO` marker prevents the queue trigger from re-syncing the document (no loop).
+WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Quelle = API:create-new-dokument`, `SkipReason = already_synced`). A `CONTEXT_INFO` marker prevents the ERP trigger from re-syncing the document (no loop).
 
 | Field | Required | Description |
 |---|---|---|
@@ -497,7 +502,7 @@ Duplicate response (same `messageId`, `allowDuplicates` off):
 | `403 Forbidden` | Request body exceeds `MAX_UPLOAD_SIZE`, or the source file is not readable |
 | `404 Not Found` | Queue entry or source file not found; or an invalid target reference for WF2 |
 | `409 Conflict` | Entry not in `in_progress`, wrong event type, or a `DMS:` reference that cannot be delivered as a local file |
-| `503 Service Unavailable` | Document sync disabled in the service config, or `dbo.SyncQueue` not present for the tenant |
+| `503 Service Unavailable` | Document sync disabled in the service config, or the APIEvent tables (`APIEventTrigger`/`APIEventDetail`) not present for the tenant — run `syncschema-init` |
 
 ---
 
