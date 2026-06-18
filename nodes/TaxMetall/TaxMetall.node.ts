@@ -1111,7 +1111,7 @@ export class TaxMetall implements INodeType {
 				type: 'string',
 				default: '',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
-				description: 'URL of the uploaded document in SharePoint (used when Success is true). Stored under Payload.sharePoint.mainUrl. Required for CREATE/EDIT uploads; leave empty for DELETE acknowledgements.',
+				description: 'URL of the uploaded document in SharePoint (used when Success is true). Stored under Payload.sharePoint.mainUrl. Required for CREATE uploads; leave empty for DELETE acknowledgements.',
 			},
 			{
 				displayName: 'Error Message',
@@ -1122,46 +1122,41 @@ export class TaxMetall implements INodeType {
 				description: 'Error text to record for the failed transfer (used when Success is false). The service logs it; the entry is retried unconditionally on the next poll.',
 			},
 
-			// Create Document (WF2)
+			// Create Document (create-new-dokument)
 			{
 				displayName: 'Area (Bereich)',
-				name: 'wf2Bereich',
+				name: 'createDokumentBereich',
 				type: 'options',
 				required: true,
 				default: 'Auftrag_s',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
-				description: 'Target area the document is attached to. The value sent to the API is the TaxMetall table name (e.g. Order → Auftrag_s). You can also switch to an expression for a dynamic value.',
+				description: 'Target area the document is attached to. Position documents are attached to the article and use Article plus the article number.',
 				options: [
 					{ name: 'Article', value: 'Artikel_s' },
 					{ name: 'Customer', value: 'Kunden_s' },
 					{ name: 'Delivery Note', value: 'Lieferschein_s' },
-					{ name: 'Delivery Note Position', value: 'Lieferscheinpos_s' },
 					{ name: 'Inquiry', value: 'Anfrage_s' },
 					{ name: 'Invoice', value: 'Rechnung_s' },
-					{ name: 'Invoice Position', value: 'Rechnungpos_s' },
 					{ name: 'Offer', value: 'Angebot_s' },
-					{ name: 'Offer Position', value: 'Angebotpos_s' },
 					{ name: 'Order', value: 'Auftrag_s' },
-					{ name: 'Order Position', value: 'Auftragpos_s' },
 					{ name: 'Project', value: 'Projekt' },
 					{ name: 'Purchase Invoice', value: 'ER' },
 					{ name: 'Purchase Order', value: 'Bestellung_s' },
-					{ name: 'Purchase Order Position', value: 'Bestellungpos_s' },
 					{ name: 'Supplier', value: 'Liefer_s' },
 				],
 			},
 			{
 				displayName: 'Document Number (Belegnummer)',
-				name: 'wf2Belegnummer',
+				name: 'createDokumentBelegnummer',
 				type: 'string',
 				required: true,
 				default: '',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
-				description: 'Number of the target record the document is attached to. For position areas use the format DocumentNumber.Position (e.g. 10523.1).',
+				description: 'Number of the target record the document is attached to. For position documents use the article number and area Article.',
 			},
 			{
 				displayName: 'SharePoint URL',
-				name: 'wf2SharePointUrl',
+				name: 'createDokumentSharePointUrl',
 				type: 'string',
 				required: true,
 				default: '',
@@ -1170,7 +1165,7 @@ export class TaxMetall implements INodeType {
 			},
 			{
 				displayName: 'Email To',
-				name: 'wf2EmailAn',
+				name: 'createDokumentEmailAn',
 				type: 'string',
 				default: '',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
@@ -1178,7 +1173,7 @@ export class TaxMetall implements INodeType {
 			},
 			{
 				displayName: 'Email Fields',
-				name: 'wf2EmailFields',
+				name: 'createDokumentEmailFields',
 				type: 'collection',
 				placeholder: 'Add email field',
 				default: {},
@@ -1195,7 +1190,7 @@ export class TaxMetall implements INodeType {
 			},
 			{
 				displayName: 'Attach All Input Binary Fields',
-				name: 'wf2AttachAllBinaries',
+				name: 'createDokumentAttachAllBinaries',
 				type: 'boolean',
 				default: false,
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
@@ -1203,12 +1198,12 @@ export class TaxMetall implements INodeType {
 			},
 			{
 				displayName: 'Attachments',
-				name: 'wf2Attachments',
+				name: 'createDokumentAttachments',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add attachment',
 				default: {},
-				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'], wf2AttachAllBinaries: [false] } },
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'], createDokumentAttachAllBinaries: [false] } },
 				description: 'Optional attachments for the generated .eml',
 				options: [
 					{
@@ -1249,7 +1244,7 @@ export class TaxMetall implements INodeType {
 			},
 			{
 				displayName: 'Allow Duplicates',
-				name: 'wf2AllowDuplicates',
+				name: 'createDokumentAllowDuplicates',
 				type: 'boolean',
 				default: false,
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
@@ -1768,7 +1763,7 @@ export class TaxMetall implements INodeType {
 						for (let d = 0; d < documents.length; d++) {
 							const doc = documents[d];
 							const docSyncId = doc.syncId as number;
-							// The service exposes a downloadUrl only for fetchable items (CREATE/EDIT).
+							// The service exposes a downloadUrl only for fetchable items (CREATE).
 							// DELETE items carry a sharePointUrl instead and have no file to download.
 							const hasFile = typeof doc.downloadUrl === 'string';
 
@@ -1894,8 +1889,8 @@ export class TaxMetall implements INodeType {
 						});
 
 					} else if (operation === 'createNew') {
-						const emailFields = this.getNodeParameter('wf2EmailFields', i, {}) as Record<string, string>;
-						const emailAn = this.getNodeParameter('wf2EmailAn', i, '') as string;
+						const emailFields = this.getNodeParameter('createDokumentEmailFields', i, {}) as Record<string, string>;
+						const emailAn = this.getNodeParameter('createDokumentEmailAn', i, '') as string;
 						const email: Record<string, unknown> = {};
 						if (emailAn) email.an = emailAn;
 						if (emailFields.von) email.von = emailFields.von;
@@ -1906,7 +1901,7 @@ export class TaxMetall implements INodeType {
 						if (emailFields.html) email.html = emailFields.html;
 
 						const attachments: Array<Record<string, unknown>> = [];
-						const attachAllBinaries = this.getNodeParameter('wf2AttachAllBinaries', i, false) as boolean;
+						const attachAllBinaries = this.getNodeParameter('createDokumentAttachAllBinaries', i, false) as boolean;
 						if (attachAllBinaries) {
 							const itemBinary = items[i].binary ?? {};
 							for (const propName of Object.keys(itemBinary)) {
@@ -1919,7 +1914,7 @@ export class TaxMetall implements INodeType {
 								});
 							}
 						} else {
-							const attachmentsInput = this.getNodeParameter('wf2Attachments', i, {}) as {
+							const attachmentsInput = this.getNodeParameter('createDokumentAttachments', i, {}) as {
 								attachment?: Array<{
 									binaryProperty?: string;
 									dateiname?: string;
@@ -1952,10 +1947,10 @@ export class TaxMetall implements INodeType {
 						}
 
 						const createBody: Record<string, unknown> = {
-							bereich: this.getNodeParameter('wf2Bereich', i),
-							belegnummer: this.getNodeParameter('wf2Belegnummer', i),
-							sharePointUrl: this.getNodeParameter('wf2SharePointUrl', i),
-							allowDuplicates: this.getNodeParameter('wf2AllowDuplicates', i, false),
+							bereich: this.getNodeParameter('createDokumentBereich', i),
+							belegnummer: this.getNodeParameter('createDokumentBelegnummer', i),
+							sharePointUrl: this.getNodeParameter('createDokumentSharePointUrl', i),
+							allowDuplicates: this.getNodeParameter('createDokumentAllowDuplicates', i, false),
 						};
 						if (Object.keys(email).length > 0) createBody.email = email;
 						if (attachments.length > 0) createBody.attachments = attachments;

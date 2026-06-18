@@ -478,7 +478,7 @@
           "displayName": "Fehlermeldung",
           "description": "Fehlertext, der für den fehlgeschlagenen Transfer gespeichert wird. Steuert das Retry-/Dead-Verhalten."
         },
-        "wf2Bereich": {
+        "createDokumentBereich": {
           "displayName": "Bereich",
           "description": "Zielbereich, an den das Dokument angehängt wird. Der an die API gesendete Wert ist der TaxMetall-Tabellenname (z. B. Auftrag → Auftrag_s). Für dynamische Werte auf Expression umschalten.",
           "options": {
@@ -500,19 +500,19 @@
             "Liefer_s": { "displayName": "Lieferant" }
           }
         },
-        "wf2Belegnummer": {
+        "createDokumentBelegnummer": {
           "displayName": "Belegnummer",
           "description": "Nummer des Zieldatensatzes, an den das Dokument angehängt wird. Für Positions-Bereiche das Format Belegnummer.Position verwenden (z. B. 10523.1)."
         },
-        "wf2SharePointUrl": {
+        "createDokumentSharePointUrl": {
           "displayName": "SharePoint-URL",
           "description": "Quell-SharePoint-URL des Dokuments. Wird unter Payload.sharePoint.mainUrl gespeichert."
         },
-        "wf2EmailAn": {
+        "createDokumentEmailAn": {
           "displayName": "E-Mail An",
           "description": "Empfängeradresse für das erzeugte .eml (email.an). Erforderlich, wenn der Dienst das .eml erzeugt."
         },
-        "wf2EmailFields": {
+        "createDokumentEmailFields": {
           "displayName": "E-Mail-Felder",
           "placeholder": "E-Mail-Feld hinzufügen",
           "description": "Weitere Felder der Quell-E-Mail zum Aufbau des .eml",
@@ -543,11 +543,11 @@
             }
           }
         },
-        "wf2AttachAllBinaries": {
+        "createDokumentAttachAllBinaries": {
           "displayName": "Alle Binärfelder anhängen",
           "description": "Ob automatisch jede am Eingangs-Item vorhandene Binärproperty angehängt wird (variable Dateianzahl, z. B. alle Anhänge eines Gmail-/IMAP-Triggers). Wenn aktiv, wird die manuelle Anhangsliste ausgeblendet und ignoriert."
         },
-        "wf2Attachments": {
+        "createDokumentAttachments": {
           "displayName": "Anhänge",
           "placeholder": "Anhang hinzufügen",
           "description": "Optionale Anhänge für das erzeugte .eml",
@@ -575,7 +575,7 @@
             }
           }
         },
-        "wf2AllowDuplicates": {
+        "createDokumentAllowDuplicates": {
           "displayName": "Duplikate zulassen",
           "description": "Ob die Deduplizierung übersprungen wird. Wenn aus (Standard), wird ein Dokument mit bereits gesehener email.messageId nicht erneut angelegt und duplicate=true zurückgegeben."
         }

@@ -296,9 +296,9 @@ Important response fields:
 | `busy` | `true` when another batch is still being processed; then `documents[]` is empty and nothing is claimed — simply poll again later |
 | `documents[]` | Entries ready for processing |
 | `documents[].syncId` | Queue entry ID — needed for download and status report |
-| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…&token=…` (CREATE/EDIT only) |
-| `documents[].eventTyp` | Event type as integer: `1` = CREATE, `2` = EDIT, `3` = DELETE |
-| `documents[].aktion` | The same event as text: `CREATE`, `EDIT` or `DELETE` |
+| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…&token=…` (CREATE only) |
+| `documents[].eventTyp` | Event type as integer: `1` = CREATE, `3` = DELETE |
+| `documents[].aktion` | The same event as text: `CREATE` or `DELETE` |
 | `documents[].belegTyp` / `belegNr` | Business document type (e.g. `Auftrag`, `Rechnung`, `Angebot`) and document number — the internal table name is not exposed |
 | `documents[].dateiname` | Source file path/name |
 | `documents[].sharePointUrl` | For DELETE events only: SharePoint URL of the previously uploaded file, so it can be removed from SharePoint. Correlated by file path (newest match wins). `null` if no prior upload is found. |
@@ -320,7 +320,7 @@ The downloaded file is placed in the chosen binary property, ready for an upload
 
 #### Check & Download New Documents
 
-Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and, using the batch-wide lease token, downloads the file for each CREATE/EDIT entry (those with a `downloadUrl`) — so you no longer need a Split/loop + a separate download node.
+Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and, using the batch-wide lease token, downloads the file for each CREATE entry (those with a `downloadUrl`) — so you no longer need a Split/loop + a separate download node.
 
 | Field | Required | Description |
 |---|---|---|
@@ -331,7 +331,7 @@ Combines **Check New Documents** and **Download Document File** into a single st
 
 - **Nothing found:** a single item `{ "success": false, "count": 0, "description": "No new documents found" }` (no binary). Use this to drive a "nothing to do" branch.
 - **Documents found:** one item per claimed document. Every item carries `success: true`, `count` (number of documents in the batch) and `index` (0-based position), in addition to:
-  - CREATE/EDIT entries (with a file): the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
+  - CREATE entries (with a file): the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
   - Non-file events (e.g. DELETE): metadata only, no binary.
   - If a single file fails to download (it was removed or skipped server-side between claim and download), that item carries `downloadError` and `httpCode` instead of a binary; the rest of the batch still comes through.
 
@@ -348,36 +348,34 @@ Reports the upload result back to the service (WF1, step 4).
 | Sync ID | Yes | `syncId` of the entry |
 | Lease Token | Yes | `leaseToken` from the same batch |
 | Success | Yes | `true` = synced successfully, `false` = transfer failed |
-| SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`). **Required only for CREATE/EDIT (upload).** For DELETE acknowledgements leave it empty — there is no new URL. |
+| SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`). **Required only for CREATE uploads.** For DELETE acknowledgements leave it empty — there is no new URL. |
 | Error Message | No | Shown when **Success** is off — error text recorded for the failed transfer |
 
 **Retry handling:** on `success = false` the service removes the in-flight entry but **keeps the work-queue row**, so the document is retried on the next poll — **unconditionally and without limit** (there is no retry counter and no `dead` state). The failure is recorded only in the service log.
 
 #### Create Document
 
-WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Quelle = API:create-new-dokument`, `SkipReason = already_synced`). A `CONTEXT_INFO` marker prevents the ERP trigger from re-syncing the document (no loop).
+WF2: creates a document in TaxMetall from mail data. When no existing file path is supplied, the service builds a standards-compliant `.eml` (via Indy) from the email fields and attachments, links it to the target record, and writes a closing audit entry (`Quelle = API:create-new-dokument`). A `CONTEXT_INFO` marker prevents the ERP trigger from re-syncing the document (no loop).
 
 | Field | Required | Description |
 |---|---|---|
-| Area (Bereich) | Yes | Target area, chosen from a dropdown. The friendly name (e.g. **Order (Auftrag)**) maps to the TaxMetall table name sent to the API (`Auftrag_s`). Switch to an expression for a dynamic value. |
-| Document Number (Belegnummer) | Yes | Number of the target record. For *Position* areas use `DocumentNumber.Position` (e.g. `10523.1`). |
+| Area (Bereich) | Yes | Target area, chosen from a dropdown. Position documents are attached to the article, so use **Article (Artikel)** for those. |
+| Document Number (Belegnummer) | Yes | Number of the target record. For position documents use the article number. |
 | SharePoint URL | Yes | Source SharePoint URL (stored under `Payload.sharePoint.mainUrl`) |
 | Email To | No* | Recipient address (`email.an`) — required when the service generates the `.eml` |
 | Attach All Input Binary Fields | No | Attach **every** binary property on the input item automatically (variable number of files, e.g. all attachments from a Gmail/IMAP trigger). When on, the manual Attachments list is hidden and ignored. |
 | Allow Duplicates | No | Skip deduplication. Off by default. |
 
-**Area (Bereich) mapping** — the dropdown sends these table names:
+**Area (Bereich) mapping** — the dropdown sends these table names. Documents attached from positions use `Artikel_s` with `BelegNr = ArtikelNr`.
 
 | Dropdown | API value | Dropdown | API value |
 |---|---|---|---|
-| Order (Auftrag) | `Auftrag_s` | Order Position | `Auftragpos_s` |
-| Offer (Angebot) | `Angebot_s` | Offer Position | `Angebotpos_s` |
-| Invoice (Rechnung) | `Rechnung_s` | Invoice Position | `Rechnungpos_s` |
-| Delivery Note (Lieferschein) | `Lieferschein_s` | Delivery Note Position | `Lieferscheinpos_s` |
-| Purchase Order (Bestellung) | `Bestellung_s` | Purchase Order Position | `Bestellungpos_s` |
+| Order (Auftrag) | `Auftrag_s` | Offer (Angebot) | `Angebot_s` |
+| Invoice (Rechnung) | `Rechnung_s` | Delivery Note (Lieferschein) | `Lieferschein_s` |
+| Purchase Order (Bestellung) | `Bestellung_s` | Article (Artikel) | `Artikel_s` |
 | Inquiry (Anfrage) | `Anfrage_s` | Project (Projekt) | `Projekt` |
 | Customer (Kunde) | `Kunden_s` | Supplier (Lieferant) | `Liefer_s` |
-| Article (Artikel) | `Artikel_s` | Purchase Invoice (ER) | `ER` |
+| Purchase Invoice (ER) | `ER` |  |  |
 
 **Email Fields** (collection — used to build the `.eml`):
 
@@ -484,7 +482,7 @@ The node assembles the request below from its fields. The same body can also be 
 Successful response (new document):
 
 ```json
-{ "success": true, "emlGenerated": true, "vtdt": "5EAD47A0-0D8B-40C3-A559-6F56B007AD67", "messageId": "<a1b2c3@mail.example.com>" }
+{ "success": true, "emlGenerated": true, "messageId": "<a1b2c3@mail.example.com>" }
 ```
 
 Duplicate response (same `messageId`, `allowDuplicates` off):
