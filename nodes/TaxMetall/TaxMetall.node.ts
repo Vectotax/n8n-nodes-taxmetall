@@ -1275,6 +1275,14 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
 				description: 'Whether to skip deduplication. When off (default), a document with an already-seen email.messageId is not created again and duplicate=true is returned.',
 			},
+			{
+				displayName: 'Also Export to Storage (Disable Loop Guard)',
+				name: 'createDokumentSuppressLoopGuard',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
+				description: 'Whether the created document should also be queued for export (WF1). Off by default: imported documents are not re-exported. Enable to mirror the document to your external storage (e.g. SharePoint) as well.',
+			},
 		],
 		usableAsTool: true,
 	};
@@ -1970,6 +1978,7 @@ export class TaxMetall implements INodeType {
 							belegnummer: this.getNodeParameter('createDokumentBelegnummer', i),
 							sharePointUrl: this.getNodeParameter('createDokumentSharePointUrl', i),
 							allowDuplicates: this.getNodeParameter('createDokumentAllowDuplicates', i, false),
+							suppressLoopGuard: this.getNodeParameter('createDokumentSuppressLoopGuard', i, false),
 						};
 						if (Object.keys(email).length > 0) createBody.email = email;
 						if (attachments.length > 0) createBody.attachments = attachments;

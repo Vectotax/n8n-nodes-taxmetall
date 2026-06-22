@@ -365,6 +365,7 @@ WF2: creates a document in TaxMetall from mail data. When no existing file path 
 | Email To | No* | Recipient address (`email.an`) — required when the service generates the `.eml` |
 | Attach All Input Binary Fields | No | Attach **every** binary property on the input item automatically (variable number of files, e.g. all attachments from a Gmail/IMAP trigger). When on, the manual Attachments list is hidden and ignored. |
 | Allow Duplicates | No | Skip deduplication. Off by default. |
+| Also Export to Storage (Disable Loop Guard) | No | Off by default — the imported document is not re-exported. Enable to additionally queue the created document for export (WF1), e.g. to mirror it to SharePoint. |
 
 **Area (Bereich) mapping** — the dropdown sends these table names. Documents attached from positions use `Artikel_s` with `BelegNr = ArtikelNr`.
 
