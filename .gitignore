@@ -1,6 +1,9 @@
 # Claude
 CLAUDE.md
 
+# Internal integration docs (not part of the public node repo / npm package)
+docs/
+
 # Dependencies
 node_modules/
 

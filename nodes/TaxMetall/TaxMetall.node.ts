@@ -24,6 +24,31 @@ interface StatisticsListResponse {
 	statistics: StatisticEntry[];
 }
 
+/**
+ * Derives the file name and MIME type of a downloaded document-sync file from the
+ * response headers. Shared by the "Download Document File" and "Check & Download
+ * New Documents" operations so both parse Content-Disposition identically
+ * (incl. RFC 5987 percent-decoding) and fall back the same way.
+ */
+function parseDownloadedFileMeta(
+	headers: Record<string, string>,
+	fallbackFileName: string,
+): { fileName: string; mimeType: string } {
+	const disposition = headers['content-disposition'] ?? '';
+	const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
+	let fileName = fallbackFileName;
+	if (fileNameMatch) {
+		const raw = fileNameMatch[1].trim();
+		try {
+			fileName = decodeURIComponent(raw);
+		} catch {
+			fileName = raw;
+		}
+	}
+	const mimeType = (headers['content-type'] ?? 'application/octet-stream').split(';')[0].trim();
+	return { fileName, mimeType };
+}
+
 export class TaxMetall implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'TaxMetall ERP',
@@ -1787,14 +1812,10 @@ export class TaxMetall implements INodeType {
 									...tlsOption,
 								})) as { body: unknown; headers: Record<string, string> };
 
-								const disposition = fileResponse.headers['content-disposition'] ?? '';
-								const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-								const fileName = fileNameMatch
-									? decodeURIComponent(fileNameMatch[1].trim())
-									: ((doc.dateiname as string)?.split(/[\\/]/).pop() || `document-${docSyncId}`);
-								const mimeType = (fileResponse.headers['content-type'] ?? 'application/octet-stream')
-									.split(';')[0]
-									.trim();
+								const { fileName, mimeType } = parseDownloadedFileMeta(
+									fileResponse.headers,
+									(doc.dateiname as string)?.split(/[\\/]/).pop() || `document-${docSyncId}`,
+								);
 								const binaryData = await this.helpers.prepareBinaryData(
 									fileResponse.body as Parameters<typeof this.helpers.prepareBinaryData>[0],
 									fileName,
@@ -1841,12 +1862,10 @@ export class TaxMetall implements INodeType {
 							...tlsOption,
 						})) as { body: unknown; headers: Record<string, string> };
 
-						const disposition = response.headers['content-disposition'] ?? '';
-						const fileNameMatch = disposition.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);
-						const fileName = fileNameMatch ? fileNameMatch[1].trim() : `document-${syncId}`;
-						const mimeType = (response.headers['content-type'] ?? 'application/octet-stream')
-							.split(';')[0]
-							.trim();
+						const { fileName, mimeType } = parseDownloadedFileMeta(
+							response.headers,
+							`document-${syncId}`,
+						);
 						const binaryData = await this.helpers.prepareBinaryData(
 							response.body as Parameters<typeof this.helpers.prepareBinaryData>[0],
 							fileName,
@@ -1877,7 +1896,7 @@ export class TaxMetall implements INodeType {
 							if (sharePointUrl) transferBody.sharePointUrl = sharePointUrl;
 						} else {
 							const transferError = this.getNodeParameter('docSyncError', i, '') as string;
-							if (transferError) transferBody.error = transferError;
+							if (transferError) transferBody.errorMessage = transferError;
 						}
 						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'POST',
