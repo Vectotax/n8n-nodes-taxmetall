@@ -470,9 +470,13 @@
           "displayName": "Erfolg",
           "description": "Ob der SharePoint-Upload erfolgreich war. Bei 'false' wird der Eintrag erneut versucht oder nach dem konfigurierten Maximum als 'dead' markiert."
         },
+        "docSyncPayloadFields": {
+          "displayName": "Payload-Felder",
+          "description": "Beliebige Key/Value-Paare, die bei Erfolg als flacher JSON-Payload gespeichert werden – z. B. Key \"sharePointUrl\" mit der URL aus einem Vorgänger-Node. Bei einem späteren DELETE-Ereignis wird der gesamte Payload zurückgegeben (z. B. um die Datei in SharePoint zu löschen). Keys dürfen nicht leer und müssen eindeutig sein. Werte werden als Strings gesendet."
+        },
         "docSyncSharePointUrl": {
-          "displayName": "SharePoint-URL",
-          "description": "URL des hochgeladenen Dokuments in SharePoint. Wird unter Payload.sharePoint.mainUrl gespeichert."
+          "displayName": "SharePoint-URL (Legacy)",
+          "description": "Optionale/Legacy-Abkürzung für eine einzelne SharePoint-URL (genutzt bei Erfolg, wenn keine Payload-Felder gesetzt sind). Wird als {\"sharePointUrl\":\"…\"} gespeichert. Bevorzugt die flexiblen \"Payload-Felder\". Bei DELETE-Bestätigungen leer lassen."
         },
         "docSyncError": {
           "displayName": "Fehlermeldung",
@@ -506,7 +510,7 @@
         },
         "createDokumentSharePointUrl": {
           "displayName": "SharePoint-URL",
-          "description": "Quell-SharePoint-URL des Dokuments. Wird unter Payload.sharePoint.mainUrl gespeichert."
+          "description": "Optionale Quell-SharePoint-URL des Dokuments. Falls gesetzt, wird sie unter Payload.sharePoint.mainUrl gespeichert. Leer lassen, um das Dokument ohne SharePoint-Referenz anzulegen (z. B. wenn der Export später über WF1 / Neue Dokumente abrufen erfolgt)."
         },
         "createDokumentEmailAn": {
           "displayName": "E-Mail An",

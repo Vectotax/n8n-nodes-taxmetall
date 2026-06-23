@@ -1131,12 +1131,33 @@ export class TaxMetall implements INodeType {
 				description: 'Whether the SharePoint transfer succeeded. This is a text field so you can pass the result from a previous step via an expression. Truthy values (case-insensitive): true, 1, yes, success; anything else counts as failed. On failure the entry stays in the queue and is retried on the next poll.',
 			},
 			{
-				displayName: 'SharePoint URL',
+				displayName: 'Payload Fields',
+				name: 'docSyncPayloadFields',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: false },
+				default: {},
+				placeholder: 'Add Field',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
+				description:
+					'Custom key/value pairs stored as the entry payload (flat JSON) when Success is true — e.g. Key "sharePointUrl" with the uploaded URL from a previous node. On a later DELETE event the whole payload is returned so you can act on it (e.g. remove the file from SharePoint). Keys must be non-empty and unique. Values are sent as strings.',
+				options: [
+					{
+						name: 'field',
+						displayName: 'Field',
+						values: [
+							{ displayName: 'Key', name: 'key', type: 'string', default: '' },
+							{ displayName: 'Value', name: 'value', type: 'string', default: '' },
+						],
+					},
+				],
+			},
+			{
+				displayName: 'SharePoint URL (Legacy)',
 				name: 'docSyncSharePointUrl',
 				type: 'string',
 				default: '',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
-				description: 'URL of the uploaded document in SharePoint (used when Success is true). Stored under Payload.sharePoint.mainUrl. Required for CREATE uploads; leave empty for DELETE acknowledgements.',
+				description: 'Optional / legacy shortcut for a single SharePoint URL (used when Success is true and no Payload Fields are set). Stored as {"sharePointUrl":"…"}. Prefer the flexible "Payload Fields" above. Leave empty for DELETE acknowledgements.',
 			},
 			{
 				displayName: 'Error Message',
@@ -1183,10 +1204,10 @@ export class TaxMetall implements INodeType {
 				displayName: 'SharePoint URL',
 				name: 'createDokumentSharePointUrl',
 				type: 'string',
-				required: true,
 				default: '',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
-				description: 'Source SharePoint URL of the document. Stored under Payload.sharePoint.mainUrl.',
+				description:
+					'Optional source SharePoint URL of the document. If set, it is stored under Payload.sharePoint.mainUrl. Leave empty to create the document without a SharePoint reference (e.g. when the export to storage is handled later by WF1 / Check New Documents).',
 			},
 			{
 				displayName: 'Email To',
@@ -1900,8 +1921,31 @@ export class TaxMetall implements INodeType {
 								['true', '1', 'yes', 'success'].includes(successRaw.trim().toLowerCase()));
 						const transferBody: Record<string, unknown> = { syncId, leaseToken, success };
 						if (success) {
-							const sharePointUrl = this.getNodeParameter('docSyncSharePointUrl', i, '') as string;
-							if (sharePointUrl) transferBody.sharePointUrl = sharePointUrl;
+							// Build the flat payload object from the key/value collection.
+							const payloadParam = this.getNodeParameter('docSyncPayloadFields', i, {}) as {
+								field?: Array<{ key?: string; value?: string }>;
+							};
+							const payloadRows = payloadParam.field ?? [];
+							const payloadObj: Record<string, string> = {};
+							for (const row of payloadRows) {
+								const key = (row.key ?? '').trim();
+								if (!key) {
+									throw new NodeOperationError(this.getNode(), 'Payload field key must not be empty', { itemIndex: i });
+								}
+								if (Object.prototype.hasOwnProperty.call(payloadObj, key)) {
+									throw new NodeOperationError(this.getNode(), `Duplicate payload key: "${key}"`, { itemIndex: i });
+								}
+								payloadObj[key] = row.value ?? '';
+							}
+							if (Object.keys(payloadObj).length > 0) {
+								if (JSON.stringify(payloadObj).length > 8192) {
+									throw new NodeOperationError(this.getNode(), 'Payload exceeds the 8192 byte limit', { itemIndex: i });
+								}
+								transferBody.payload = payloadObj;
+							} else {
+								const sharePointUrl = (this.getNodeParameter('docSyncSharePointUrl', i, '') as string).trim();
+								if (sharePointUrl) transferBody.sharePointUrl = sharePointUrl;
+							}
 						} else {
 							const transferError = this.getNodeParameter('docSyncError', i, '') as string;
 							if (transferError) transferBody.errorMessage = transferError;
@@ -1976,10 +2020,12 @@ export class TaxMetall implements INodeType {
 						const createBody: Record<string, unknown> = {
 							bereich: this.getNodeParameter('createDokumentBereich', i),
 							belegnummer: this.getNodeParameter('createDokumentBelegnummer', i),
-							sharePointUrl: this.getNodeParameter('createDokumentSharePointUrl', i),
 							allowDuplicates: this.getNodeParameter('createDokumentAllowDuplicates', i, false),
 							suppressLoopGuard: this.getNodeParameter('createDokumentSuppressLoopGuard', i, false),
 						};
+						// sharePointUrl is optional now — only send it when provided.
+						const createSharePointUrl = (this.getNodeParameter('createDokumentSharePointUrl', i, '') as string).trim();
+						if (createSharePointUrl) createBody.sharePointUrl = createSharePointUrl;
 						if (Object.keys(email).length > 0) createBody.email = email;
 						if (attachments.length > 0) createBody.attachments = attachments;
 

@@ -301,7 +301,9 @@ Important response fields:
 | `documents[].aktion` | The same event as text: `CREATE` or `DELETE` |
 | `documents[].belegTyp` / `belegNr` | Business document type (e.g. `Auftrag`, `Rechnung`, `Angebot`) and document number — the internal table name is not exposed |
 | `documents[].dateiname` | Source file path/name |
-| `documents[].sharePointUrl` | For DELETE events only: SharePoint URL of the previously uploaded file, so it can be removed from SharePoint. Correlated by file path (newest match wins). `null` if no prior upload is found. |
+| `documents[].email` | For mail documents (`Typ=2`) on CREATE events: `{ from, to, subject, date }` from the document record — handy when uploading the mail to storage. Absent for non-mail documents. |
+| `documents[].sharePointUrl` | For DELETE events only: SharePoint URL of the previously uploaded file, so it can be removed from SharePoint. Derived from the stored payload (`payload.sharePointUrl` or legacy `payload.sharePoint.mainUrl`). `null` if no prior upload is found. |
+| `documents[].payload` | For DELETE events only: the **full** payload object that was stored on the prior transfer status (whatever key/value pairs were sent), or `null` if none / already purged by retention. |
 | `skipped[]` | Entries the service skipped this batch — `dms_reference`, `file_not_found`, `file_unreadable`, or `superseded` (an older event for the same file path, collapsed because only the latest state matters; see Coalescing below) |
 
 **Coalescing (per file path):** Between two polls the same file can be created/deleted several times (e.g. created → deleted → created). For SharePoint only the **final state** matters. On each claim the service therefore keeps **only the latest event per file path** (highest `syncId`) and marks the earlier ones `skipped` / `superseded`. Combined with the delete correlation this means: a created→deleted pair where nothing was ever uploaded collapses to a no-op (the kept DELETE event returns `sharePointUrl: null`), while created→deleted→created collapses to a single upload of the latest version.
@@ -348,10 +350,11 @@ Reports the upload result back to the service (WF1, step 4).
 | Sync ID | Yes | `syncId` of the entry |
 | Lease Token (Legacy) | No | Optional / legacy — no longer validated by the service. Leave empty. Kept for backward compatibility; will be removed in a future major version. |
 | Success | Yes | `true` = synced successfully, `false` = transfer failed |
-| SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`). **Required only for CREATE uploads.** For DELETE acknowledgements leave it empty — there is no new URL. |
+| Payload Fields | No | Shown when **Success** is on — **custom key/value pairs** stored as the entry payload (flat JSON), e.g. Key `sharePointUrl` with the uploaded URL. Stored verbatim and **returned in full on a later DELETE event** (`documents[].payload`) so you can act on it. Keys must be non-empty and unique; values are sent as strings. Total payload limited to 8 KB. |
+| SharePoint URL (Legacy) | No | Optional shortcut for a single URL, used only when **no Payload Fields** are set; stored as `{"sharePointUrl":"…"}`. Prefer **Payload Fields**. Optional in all cases (URL is no longer required). |
 | Error Message | No | Shown when **Success** is off — error text recorded for the failed transfer |
 
-**Retry handling:** on `success = false` the service removes the in-flight entry but **keeps the work-queue row**, so the document is retried on the next poll — **unconditionally and without limit** (there is no retry counter and no `dead` state). The failure is recorded only in the service log.
+**Retry handling:** on `success = false` the service **keeps the work-queue row**, so the document is retried on the next poll — **unconditionally and without limit** (there is no retry counter and no `dead` state). The failure is recorded only in the service log.
 
 #### Create Document
 
@@ -361,7 +364,7 @@ WF2: creates a document in TaxMetall from mail data. When no existing file path 
 |---|---|---|
 | Area (Bereich) | Yes | Target area, chosen from a dropdown. Position documents are attached to the article, so use **Article (Artikel)** for those. |
 | Document Number (Belegnummer) | Yes | Number of the target record. For position documents use the article number. |
-| SharePoint URL | Yes | Source SharePoint URL (stored under `Payload.sharePoint.mainUrl`) |
+| SharePoint URL | No | Optional source SharePoint URL (stored under `Payload.sharePoint.mainUrl` when set). Leave empty to create the document without a SharePoint reference — e.g. when the export to storage is handled later by WF1 (enable **Also Export to Storage**). |
 | Email To | No* | Recipient address (`email.an`) — required when the service generates the `.eml` |
 | Attach All Input Binary Fields | No | Attach **every** binary property on the input item automatically (variable number of files, e.g. all attachments from a Gmail/IMAP trigger). When on, the manual Attachments list is hidden and ignored. |
 | Allow Duplicates | No | Skip deduplication. Off by default. |
