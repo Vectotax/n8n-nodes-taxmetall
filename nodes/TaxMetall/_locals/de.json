@@ -458,10 +458,6 @@
           "displayName": "Sync-ID",
           "description": "Die syncId des Warteschlangeneintrags (aus 'Neue Dokumente abrufen')"
         },
-        "docSyncLeaseToken": {
-          "displayName": "Lease-Token (Legacy)",
-          "description": "Optional / Legacy. Der Dienst prüft dieses Token nicht mehr (die Claim-Sperre liegt jetzt In-Memory pro Mandant). Leer lassen; nur zur Abwärtskompatibilität erhalten, wird in einer künftigen Major-Version entfernt."
-        },
         "docSyncBinaryProperty": {
           "displayName": "Ausgabedatei in Feld ablegen",
           "description": "Name der Binärproperty, in die die heruntergeladene Datei geschrieben wird"
@@ -473,10 +469,6 @@
         "docSyncPayloadFields": {
           "displayName": "Payload-Felder",
           "description": "Beliebige Key/Value-Paare, die bei Erfolg als flacher JSON-Payload gespeichert werden – z. B. Key \"sharePointUrl\" mit der URL aus einem Vorgänger-Node. Bei einem späteren DELETE-Ereignis wird der gesamte Payload zurückgegeben (z. B. um die Datei in SharePoint zu löschen). Keys dürfen nicht leer und müssen eindeutig sein. Werte werden als Strings gesendet."
-        },
-        "docSyncSharePointUrl": {
-          "displayName": "SharePoint-URL (Legacy)",
-          "description": "Optionale/Legacy-Abkürzung für eine einzelne SharePoint-URL (genutzt bei Erfolg, wenn keine Payload-Felder gesetzt sind). Wird als {\"sharePointUrl\":\"…\"} gespeichert. Bevorzugt die flexiblen \"Payload-Felder\". Bei DELETE-Bestätigungen leer lassen."
         },
         "docSyncError": {
           "displayName": "Fehlermeldung",

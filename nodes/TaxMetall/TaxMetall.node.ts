@@ -1099,16 +1099,6 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'transferStatus'] } },
 				description: 'The syncId of the queue entry, as returned by Check New Documents',
 			},
-			{
-				displayName: 'Lease Token (Legacy)',
-				name: 'docSyncLeaseToken',
-				type: 'string',
-				typeOptions: { password: true },
-				default: '',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'transferStatus'] } },
-				description:
-					'Optional / legacy. The service no longer validates this token (claim locking is now in-memory per tenant). Leave empty; it is kept only for backward compatibility and will be removed in a future major version.',
-			},
 
 			// Download Document File
 			{
@@ -1150,14 +1140,6 @@ export class TaxMetall implements INodeType {
 						],
 					},
 				],
-			},
-			{
-				displayName: 'SharePoint URL (Legacy)',
-				name: 'docSyncSharePointUrl',
-				type: 'string',
-				default: '',
-				displayOptions: { show: { resource: ['documentSync'], operation: ['transferStatus'] } },
-				description: 'Optional / legacy shortcut for a single SharePoint URL (used when Success is true and no Payload Fields are set). Stored as {"sharePointUrl":"…"}. Prefer the flexible "Payload Fields" above. Leave empty for DELETE acknowledgements.',
 			},
 			{
 				displayName: 'Error Message',
@@ -1786,8 +1768,7 @@ export class TaxMetall implements INodeType {
 					} else if (operation === 'claimAndDownload') {
 						const binaryPropertyName = this.getNodeParameter('docSyncBinaryProperty', i, 'data') as string;
 
-						// 1) Claim a batch — the service only returns relevant (pending) entries
-						//    and assigns one batch-wide leaseToken.
+						// 1) Claim a batch — the service only returns relevant (pending) entries.
 						const claimBody: Record<string, unknown> = {};
 						const claimLimit = this.getNodeParameter('docSyncLimit', i) as number;
 						if (claimLimit && claimLimit > 0) claimBody.limit = claimLimit;
@@ -1798,9 +1779,8 @@ export class TaxMetall implements INodeType {
 							headers,
 							json: true,
 							...tlsOption,
-						})) as { leaseToken: string; documents?: Array<Record<string, unknown>> };
+						})) as { documents?: Array<Record<string, unknown>> };
 
-						const leaseToken = claim.leaseToken;
 						const documents = Array.isArray(claim.documents) ? claim.documents : [];
 						const count = documents.length;
 
@@ -1813,7 +1793,7 @@ export class TaxMetall implements INodeType {
 							continue;
 						}
 
-						// 3) Download the file for each claimed document (same batch-wide leaseToken).
+						// 3) Download the file for each claimed document.
 						for (let d = 0; d < documents.length; d++) {
 							const doc = documents[d];
 							const docSyncId = doc.syncId as number;
@@ -1824,7 +1804,7 @@ export class TaxMetall implements INodeType {
 							if (!hasFile) {
 								// e.g. a DELETE event — no file to fetch, pass metadata through
 								returnData.push({
-									json: { success: true, count, index: d, ...doc, leaseToken },
+									json: { success: true, count, index: d, ...doc },
 									pairedItem: { item: i },
 								});
 								continue;
@@ -1834,7 +1814,7 @@ export class TaxMetall implements INodeType {
 								const fileResponse = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 									method: 'GET',
 									url: `${baseUrl}/api/document-file`,
-									qs: { syncId: docSyncId, token: leaseToken },
+									qs: { syncId: docSyncId },
 									headers,
 									encoding: 'arraybuffer',
 									returnFullResponse: true,
@@ -1852,7 +1832,7 @@ export class TaxMetall implements INodeType {
 								);
 
 								returnData.push({
-									json: { success: true, count, index: d, ...doc, leaseToken, fileName, mimeType },
+									json: { success: true, count, index: d, ...doc, fileName, mimeType },
 									binary: { [binaryPropertyName]: binaryData },
 									pairedItem: { item: i },
 								});
@@ -1866,7 +1846,6 @@ export class TaxMetall implements INodeType {
 										count,
 										index: d,
 										...doc,
-										leaseToken,
 										downloadError: err.message ?? String(downloadError),
 										httpCode: err.httpCode,
 									},
@@ -1878,13 +1857,12 @@ export class TaxMetall implements INodeType {
 
 					} else if (operation === 'downloadFile') {
 						const syncId = this.getNodeParameter('docSyncId', i) as string;
-						const leaseToken = this.getNodeParameter('docSyncLeaseToken', i) as string;
 						const binaryPropertyName = this.getNodeParameter('docSyncBinaryProperty', i) as string;
 
 						const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'GET',
 							url: `${baseUrl}/api/document-file`,
-							qs: { syncId, token: leaseToken },
+							qs: { syncId },
 							headers,
 							encoding: 'arraybuffer',
 							returnFullResponse: true,
@@ -1902,7 +1880,7 @@ export class TaxMetall implements INodeType {
 						);
 
 						returnData.push({
-							json: { syncId, leaseToken, fileName, mimeType },
+							json: { syncId, fileName, mimeType },
 							binary: { [binaryPropertyName]: binaryData },
 							pairedItem: { item: i },
 						});
@@ -1910,7 +1888,6 @@ export class TaxMetall implements INodeType {
 
 					} else if (operation === 'transferStatus') {
 						const syncId = this.getNodeParameter('docSyncId', i) as string;
-						const leaseToken = this.getNodeParameter('docSyncLeaseToken', i) as string;
 						// "Success" is a string field so the value can be passed in from an
 						// upstream step (e.g. {{ $json.success }}); coerce it to a real boolean.
 						const successRaw = this.getNodeParameter('docSyncSuccess', i) as unknown;
@@ -1919,7 +1896,7 @@ export class TaxMetall implements INodeType {
 							successRaw === 1 ||
 							(typeof successRaw === 'string' &&
 								['true', '1', 'yes', 'success'].includes(successRaw.trim().toLowerCase()));
-						const transferBody: Record<string, unknown> = { syncId, leaseToken, success };
+						const transferBody: Record<string, unknown> = { syncId, success };
 						if (success) {
 							// Build the flat payload object from the key/value collection.
 							const payloadParam = this.getNodeParameter('docSyncPayloadFields', i, {}) as {
@@ -1942,9 +1919,6 @@ export class TaxMetall implements INodeType {
 									throw new NodeOperationError(this.getNode(), 'Payload exceeds the 8192 byte limit', { itemIndex: i });
 								}
 								transferBody.payload = payloadObj;
-							} else {
-								const sharePointUrl = (this.getNodeParameter('docSyncSharePointUrl', i, '') as string).trim();
-								if (sharePointUrl) transferBody.sharePointUrl = sharePointUrl;
 							}
 						} else {
 							const transferError = this.getNodeParameter('docSyncError', i, '') as string;

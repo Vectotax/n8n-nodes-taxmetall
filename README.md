@@ -282,7 +282,7 @@ The service stores the resulting SharePoint URL under `Payload.sharePoint.mainUr
 
 #### Check New Documents
 
-Claims up to **Limit** pending entries from the work queue and returns a **lease token** plus the list of documents to process (WF1, step 1). Each call generates a fresh lease token; only the holder of that token may download a claimed file or report its status, and the lease expires after the service-configured number of seconds.
+Claims up to **Limit** pending entries from the work queue and returns the list of documents to process (WF1, step 1). Claim locking is handled in-memory per tenant by the service — there is no token to pass around.
 
 | Field | Required | Description |
 |---|---|---|
@@ -292,11 +292,10 @@ Important response fields:
 
 | Field | Description |
 |---|---|
-| `leaseToken` | **Legacy / optional.** A per-batch token that is still returned for backward compatibility but is **no longer validated** by the service (claim locking is now in-memory per tenant). It will be removed in a future major version. |
 | `busy` | `true` when another batch is still being processed; then `documents[]` is empty and nothing is claimed — simply poll again later |
 | `documents[]` | Entries ready for processing |
 | `documents[].syncId` | Queue entry ID — needed for download and status report |
-| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…&token=…` (CREATE only) |
+| `documents[].downloadUrl` | Ready-to-use relative URL `/api/document-file?syncId=…` (CREATE only) |
 | `documents[].eventTyp` | Event type as integer: `1` = CREATE, `3` = DELETE |
 | `documents[].aktion` | The same event as text: `CREATE` or `DELETE` |
 | `documents[].belegTyp` / `belegNr` | Business document type (e.g. `Auftrag`, `Rechnung`, `Angebot`) and document number — the internal table name is not exposed |
@@ -315,14 +314,13 @@ Downloads the file of a single claimed entry as **binary data** (WF1, step 2). T
 | Field | Required | Description |
 |---|---|---|
 | Sync ID | Yes | `syncId` of the entry (from Check New Documents) |
-| Lease Token (Legacy) | No | Optional / legacy — no longer validated by the service. Leave empty. Kept for backward compatibility; will be removed in a future major version. |
 | Put Output File in Field | Yes | Name of the binary property to write the file to (default `data`) |
 
-The downloaded file is placed in the chosen binary property, ready for an upload node (e.g. **HTTP Request** or a **Microsoft SharePoint** node). The item JSON also carries `syncId`, `leaseToken`, `fileName` and `mimeType`.
+The downloaded file is placed in the chosen binary property, ready for an upload node (e.g. **HTTP Request** or a **Microsoft SharePoint** node). The item JSON also carries `syncId`, `fileName` and `mimeType`.
 
 #### Check & Download New Documents
 
-Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and, using the batch-wide lease token, downloads the file for each CREATE entry (those with a `downloadUrl`) — so you no longer need a Split/loop + a separate download node.
+Combines **Check New Documents** and **Download Document File** into a single step (WF1, steps 1 + 2). It claims a batch from the queue and downloads the file for each CREATE entry (those with a `downloadUrl`) — so you no longer need a Split/loop + a separate download node.
 
 | Field | Required | Description |
 |---|---|---|
@@ -333,13 +331,13 @@ Combines **Check New Documents** and **Download Document File** into a single st
 
 - **Nothing found:** a single item `{ "success": false, "count": 0, "description": "No new documents found" }` (no binary). Use this to drive a "nothing to do" branch.
 - **Documents found:** one item per claimed document. Every item carries `success: true`, `count` (number of documents in the batch) and `index` (0-based position), in addition to:
-  - CREATE entries (with a file): the full document metadata plus `leaseToken`, `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
+  - CREATE entries (with a file): the full document metadata plus `fileName` and `mimeType`; the file is in the chosen binary property — ready to wire straight into an upload node.
   - Non-file events (e.g. DELETE): metadata only, no binary.
   - If a single file fails to download (it was removed or skipped server-side between claim and download), that item carries `downloadError` and `httpCode` instead of a binary; the rest of the batch still comes through.
 
 Tip: filter downstream on `{{ $json.success }}` to separate the "found" items from the empty-result item.
 
-Because the `leaseToken` and `syncId` are on every found item, a downstream **Report SharePoint Transfer Status** can acknowledge each entry as usual. Use the low-level **Check New Documents** / **Download Document File** operations only when you need full manual control over the claim/download split.
+Because the `syncId` is on every found item, a downstream **Report SharePoint Transfer Status** can acknowledge each entry as usual. Use the low-level **Check New Documents** / **Download Document File** operations only when you need full manual control over the claim/download split.
 
 #### Report SharePoint Transfer Status
 
@@ -348,10 +346,8 @@ Reports the upload result back to the service (WF1, step 4).
 | Field | Required | Description |
 |---|---|---|
 | Sync ID | Yes | `syncId` of the entry |
-| Lease Token (Legacy) | No | Optional / legacy — no longer validated by the service. Leave empty. Kept for backward compatibility; will be removed in a future major version. |
 | Success | Yes | `true` = synced successfully, `false` = transfer failed |
 | Payload Fields | No | Shown when **Success** is on — **custom key/value pairs** stored as the entry payload (flat JSON), e.g. Key `sharePointUrl` with the uploaded URL. Stored verbatim and **returned in full on a later DELETE event** (`documents[].payload`) so you can act on it. Keys must be non-empty and unique; values are sent as strings. Total payload limited to 8 KB. |
-| SharePoint URL (Legacy) | No | Optional shortcut for a single URL, used only when **no Payload Fields** are set; stored as `{"sharePointUrl":"…"}`. Prefer **Payload Fields**. Optional in all cases (URL is no longer required). |
 | Error Message | No | Shown when **Success** is off — error text recorded for the failed transfer |
 
 **Retry handling:** on `success = false` the service **keeps the work-queue row**, so the document is retried on the next poll — **unconditionally and without limit** (there is no retry counter and no `dead` state). The failure is recorded only in the service log.
@@ -427,7 +423,7 @@ The duplicate check matches on the previously stored `JSON_VALUE(Payload, '$.ema
       ↓
 [Upload to SharePoint]                                          → sharePointUrl
       ↓
-[TaxMetall ERP · Document Sync · Report Transfer Status]        (success = true, sharePointUrl)
+[TaxMetall ERP · Document Sync · Report Transfer Status]        (success = true, Payload Field sharePointUrl)
 ```
 
 **WF1 — Export to SharePoint (manual claim/download split):**
@@ -435,13 +431,13 @@ The duplicate check matches on the previously stored `JSON_VALUE(Payload, '$.ema
 ```text
 [Schedule/Trigger]
       ↓
-[TaxMetall ERP · Document Sync · Check New Documents]   → leaseToken, documents[]
+[TaxMetall ERP · Document Sync · Check New Documents]   → documents[]
       ↓ (Split / loop over documents[])
 [TaxMetall ERP · Document Sync · Download Document File] → binary "data"
       ↓
 [Upload to SharePoint]                                  → sharePointUrl
       ↓
-[TaxMetall ERP · Document Sync · Report Transfer Status] (success = true, sharePointUrl)
+[TaxMetall ERP · Document Sync · Report Transfer Status] (success = true, Payload Field sharePointUrl)
 ```
 
 On an upload failure, set **Success** = `false` and pass the error message — the entry is retried and eventually marked dead.
