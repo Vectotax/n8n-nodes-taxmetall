@@ -292,7 +292,7 @@ Important response fields:
 
 | Field | Description |
 |---|---|
-| `leaseToken` | Token authorizing access to all claimed entries in this batch |
+| `leaseToken` | **Legacy / optional.** A per-batch token that is still returned for backward compatibility but is **no longer validated** by the service (claim locking is now in-memory per tenant). It will be removed in a future major version. |
 | `busy` | `true` when another batch is still being processed; then `documents[]` is empty and nothing is claimed — simply poll again later |
 | `documents[]` | Entries ready for processing |
 | `documents[].syncId` | Queue entry ID — needed for download and status report |
@@ -313,7 +313,7 @@ Downloads the file of a single claimed entry as **binary data** (WF1, step 2). T
 | Field | Required | Description |
 |---|---|---|
 | Sync ID | Yes | `syncId` of the entry (from Check New Documents) |
-| Lease Token | Yes | `leaseToken` from the same batch |
+| Lease Token (Legacy) | No | Optional / legacy — no longer validated by the service. Leave empty. Kept for backward compatibility; will be removed in a future major version. |
 | Put Output File in Field | Yes | Name of the binary property to write the file to (default `data`) |
 
 The downloaded file is placed in the chosen binary property, ready for an upload node (e.g. **HTTP Request** or a **Microsoft SharePoint** node). The item JSON also carries `syncId`, `leaseToken`, `fileName` and `mimeType`.
@@ -346,7 +346,7 @@ Reports the upload result back to the service (WF1, step 4).
 | Field | Required | Description |
 |---|---|---|
 | Sync ID | Yes | `syncId` of the entry |
-| Lease Token | Yes | `leaseToken` from the same batch |
+| Lease Token (Legacy) | No | Optional / legacy — no longer validated by the service. Leave empty. Kept for backward compatibility; will be removed in a future major version. |
 | Success | Yes | `true` = synced successfully, `false` = transfer failed |
 | SharePoint URL | No | Shown when **Success** is on — the uploaded document URL (stored under `Payload.sharePoint.mainUrl`). **Required only for CREATE uploads.** For DELETE acknowledgements leave it empty — there is no new URL. |
 | Error Message | No | Shown when **Success** is off — error text recorded for the failed transfer |

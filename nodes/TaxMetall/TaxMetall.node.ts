@@ -1100,14 +1100,14 @@ export class TaxMetall implements INodeType {
 				description: 'The syncId of the queue entry, as returned by Check New Documents',
 			},
 			{
-				displayName: 'Lease Token',
+				displayName: 'Lease Token (Legacy)',
 				name: 'docSyncLeaseToken',
 				type: 'string',
 				typeOptions: { password: true },
-				required: true,
 				default: '',
 				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'transferStatus'] } },
-				description: 'The leaseToken returned by Check New Documents. It authorizes access to the claimed entry.',
+				description:
+					'Optional / legacy. The service no longer validates this token (claim locking is now in-memory per tenant). Leave empty; it is kept only for backward compatibility and will be removed in a future major version.',
 			},
 
 			// Download Document File

@@ -459,8 +459,8 @@
           "description": "Die syncId des Warteschlangeneintrags (aus 'Neue Dokumente abrufen')"
         },
         "docSyncLeaseToken": {
-          "displayName": "Lease-Token",
-          "description": "Der leaseToken aus 'Neue Dokumente abrufen'. Er autorisiert den Zugriff auf den beanspruchten Eintrag."
+          "displayName": "Lease-Token (Legacy)",
+          "description": "Optional / Legacy. Der Dienst prüft dieses Token nicht mehr (die Claim-Sperre liegt jetzt In-Memory pro Mandant). Leer lassen; nur zur Abwärtskompatibilität erhalten, wird in einer künftigen Major-Version entfernt."
         },
         "docSyncBinaryProperty": {
           "displayName": "Ausgabedatei in Feld ablegen",
