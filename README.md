@@ -302,9 +302,9 @@ Important response fields:
 | `documents[].dateiname` | Source file path/name |
 | `documents[].email` | For mail documents (`Typ=2`) on CREATE events: `{ from, to, subject, date }` from the document record — handy when uploading the mail to storage. Absent for non-mail documents. |
 | `documents[].payload` | For DELETE events only: the **full** payload object that was stored on the prior upload (the transfer-status `payload`, or — for documents imported via Create Document — `{ "sharePoint": { "mainUrl": … } }`), so you can remove the file from SharePoint. Read the URL from `payload.sharePointUrl` or `payload.sharePoint.mainUrl`. `null` if no prior upload is found / already purged by retention. |
-| `skipped[]` | Entries the service skipped this batch — `dms_reference`, `file_not_found`, `file_unreadable`, or `superseded` (an older event for the same file path, collapsed because only the latest state matters; see Coalescing below) |
+| `skipped[]` | Entries the service skipped this batch (informational only — nothing to download/upload) — `dms_reference` (a `DMS:` pointer, not a local file) or `file_not_found` (the referenced file is no longer on disk). Both occur only on CREATE events and the queue row is removed permanently. |
 
-**Coalescing (per file path):** Between two polls the same file can be created/deleted several times (e.g. created → deleted → created). For SharePoint only the **final state** matters. On each claim the service therefore keeps **only the latest event per file path** (highest `syncId`) and marks the earlier ones `skipped` / `superseded`. Combined with the delete correlation this means: a created→deleted pair where nothing was ever uploaded collapses to a no-op (the kept DELETE event returns `payload: null`), while created→deleted→created collapses to a single upload of the latest version.
+**Coalescing (per file path):** Between two polls the same file can be created/deleted several times (e.g. created → deleted → created). For SharePoint only the **final state** matters. Coalescing is handled in the ERP trigger itself (only the latest event per file path / highest `syncId` is kept in the queue), so superseded earlier events never reach `check-new-documents` — there is no `superseded` skip reason. Combined with the delete correlation this means: a created→deleted pair where nothing was ever uploaded collapses to a no-op (the kept DELETE event returns `payload: null`), while created→deleted→created collapses to a single upload of the latest version.
 
 #### Download Document File
 
@@ -439,7 +439,7 @@ The duplicate check matches on the previously stored `JSON_VALUE(Payload, '$.ema
 [TaxMetall ERP · Document Sync · Report Transfer Status] (success = true, Payload Field sharePointUrl)
 ```
 
-On an upload failure, set **Success** = `false` and pass the error message — the entry is retried and eventually marked dead.
+On an upload failure, set **Success** = `false` and pass the error message — the entry stays in the queue and is retried on the next poll, unconditionally and without limit (no retry counter, no `dead` state).
 
 **WF2 — Import from SharePoint / mail:**
 
@@ -495,10 +495,10 @@ Duplicate response (same `messageId`, `allowDuplicates` off):
 | Status | Meaning |
 |---|---|
 | `400 Bad Request` | Missing/invalid field — e.g. `bereich`/`belegnummer` missing, no `sharePointUrl`, `email.an` or body missing, invalid Base64, or `allowDuplicates` not boolean |
-| `401 Unauthorized` | Lease token missing, wrong, or expired (download / status report) |
+| `401 Unauthorized` | API key (`tax-api-key` header) missing or invalid |
 | `403 Forbidden` | Request body exceeds `MAX_UPLOAD_SIZE`, or the source file is not readable |
 | `404 Not Found` | Queue entry or source file not found; or an invalid target reference for WF2 |
-| `409 Conflict` | Entry not in `in_progress`, wrong event type, or a `DMS:` reference that cannot be delivered as a local file |
+| `409 Conflict` | Wrong event type (e.g. a DELETE event has no file to download), or a `DMS:` reference that cannot be delivered as a local file |
 | `503 Service Unavailable` | Document sync disabled in the service config, or the APIEvent tables (`APIEventTrigger`/`APIEventDetail`) not present for the tenant — run `syncschema-init` |
 
 ---
