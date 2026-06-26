@@ -93,6 +93,7 @@ export class TaxMetall implements INodeType {
 				downloadFile: 'Download File',
 				transferStatus: 'Transfer Status',
 				createNew: 'Create Document',
+				unpackMsg: 'Unpack MSG',
 			}[$parameter["operation"]] ?? $parameter["operation"])
 		}}`,
 		defaults: {
@@ -316,6 +317,7 @@ export class TaxMetall implements INodeType {
 					{ name: 'Create Document', value: 'createNew', action: 'Create a document from mail data in tax metall' },
 					{ name: 'Download Document File', value: 'downloadFile', action: 'Download a claimed document file' },
 					{ name: 'Report Transfer Status', value: 'transferStatus', action: 'Report the share point transfer status' },
+					{ name: 'Unpack MSG File', value: 'unpackMsg', action: 'Unpack a stored msg file' },
 				],
 				default: 'checkNew',
 				noDataExpression: true,
@@ -1286,6 +1288,25 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['documentSync'], operation: ['createNew'] } },
 				description: 'Whether the created document should also be queued for export (WF1). Off by default: imported documents are not re-exported. Enable to mirror the document to your external storage (e.g. SharePoint) as well.',
 			},
+
+			// Unpack MSG (unpack-msg)
+			{
+				displayName: 'File Name',
+				name: 'unpackMsgDateiname',
+				type: 'string',
+				required: true,
+				default: '',
+				displayOptions: { show: { resource: ['documentSync'], operation: ['unpackMsg'] } },
+				description: 'Name of the stored .msg file. A bare file name is resolved against the ERP mail folder (SDTMP); a full path is used as-is.',
+			},
+			{
+				displayName: 'Include Attachment Content',
+				name: 'unpackMsgIncludeContent',
+				type: 'boolean',
+				default: true,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['unpackMsg'] } },
+				description: 'Whether to include each attachment\'s Base64 content (contentBase64). Turn off for a faster metadata-only listing; sizeBytes is always included.',
+			},
 		],
 		usableAsTool: true,
 	};
@@ -2007,6 +2028,20 @@ export class TaxMetall implements INodeType {
 							method: 'POST',
 							url: `${baseUrl}/api/create-new-dokument`,
 							body: createBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+
+					} else if (operation === 'unpackMsg') {
+						const unpackBody: Record<string, unknown> = {
+							dateiname: this.getNodeParameter('unpackMsgDateiname', i),
+							includeContent: this.getNodeParameter('unpackMsgIncludeContent', i, true),
+						};
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/unpack-msg`,
+							body: unpackBody,
 							headers,
 							json: true,
 							...tlsOption,

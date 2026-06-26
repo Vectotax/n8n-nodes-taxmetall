@@ -91,6 +91,10 @@
               "displayName": "Transferstatus melden",
               "action": "SharePoint-Transferstatus melden"
             },
+            "unpackMsg": {
+              "displayName": "MSG entpacken",
+              "action": "Eine gespeicherte MSG-Datei entpacken"
+            },
             "execute": {
               "displayName": "Ausführen",
               "action": "Statistik-Bericht ausführen"
@@ -574,6 +578,14 @@
         "createDokumentAllowDuplicates": {
           "displayName": "Duplikate zulassen",
           "description": "Ob die Deduplizierung übersprungen wird. Wenn aus (Standard), wird ein Dokument mit bereits gesehener email.messageId nicht erneut angelegt und duplicate=true zurückgegeben."
+        },
+        "unpackMsgDateiname": {
+          "displayName": "Dateiname",
+          "description": "Name der gespeicherten .msg-Datei. Ein bloßer Dateiname wird gegen den ERP-Mailordner (SDTMP) aufgelöst; ein vollständiger Pfad wird unverändert verwendet."
+        },
+        "unpackMsgIncludeContent": {
+          "displayName": "Anhang-Inhalt einschließen",
+          "description": "Ob der Base64-Inhalt jedes Anhangs (contentBase64) mitgeliefert wird. Ausschalten für eine schnellere reine Metadaten-Liste; sizeBytes ist immer enthalten."
         }
       }
     }
