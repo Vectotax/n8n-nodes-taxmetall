@@ -466,6 +466,10 @@
           "displayName": "Ausgabedatei in Feld ablegen",
           "description": "Name der Binärproperty, in die die heruntergeladene Datei geschrieben wird"
         },
+        "docSyncUnpackMail": {
+          "displayName": "MSG/EML entpacken",
+          "description": "Ob .msg/.eml-Dokumente automatisch entpackt als JSON (meta/body/attachments, Anhänge Base64) statt als Rohdatei geliefert werden. Der Dienst erkennt das Format; andere Dateitypen werden unverändert als Binärdatei geliefert (kein Fehler). Beim Entpacken trägt das Item JSON statt einer Binärdatei."
+        },
         "docSyncSuccess": {
           "displayName": "Erfolg",
           "description": "Ob der SharePoint-Upload erfolgreich war. Bei 'false' wird der Eintrag erneut versucht oder nach dem konfigurierten Maximum als 'dead' markiert."

@@ -1112,6 +1112,14 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'claimAndDownload'] } },
 				description: 'Name of the binary property to write the downloaded file to',
 			},
+			{
+				displayName: 'Unpack MSG/EML',
+				name: 'docSyncUnpackMail',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['documentSync'], operation: ['downloadFile', 'claimAndDownload'] } },
+				description: 'Whether to deliver .msg/.eml documents automatically unpacked as JSON (meta/body/attachments, attachments Base64) instead of the raw file. The service detects the format; other file types are returned unchanged as a binary file (no error). When unpacked, the item carries JSON instead of a binary.',
+			},
 
 			// Report Transfer Status
 			{
@@ -1788,6 +1796,7 @@ export class TaxMetall implements INodeType {
 
 					} else if (operation === 'claimAndDownload') {
 						const binaryPropertyName = this.getNodeParameter('docSyncBinaryProperty', i, 'data') as string;
+						const unpackMail = this.getNodeParameter('docSyncUnpackMail', i, false) as boolean;
 
 						// 1) Claim a batch — the service only returns relevant (pending) entries.
 						const claimBody: Record<string, unknown> = {};
@@ -1832,15 +1841,28 @@ export class TaxMetall implements INodeType {
 							}
 
 							try {
+								const fileQs: Record<string, string | number> = { syncId: docSyncId };
+								if (unpackMail) fileQs.unpack = 'true';
 								const fileResponse = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 									method: 'GET',
 									url: `${baseUrl}/api/document-file`,
-									qs: { syncId: docSyncId },
+									qs: fileQs,
 									headers,
 									encoding: 'arraybuffer',
 									returnFullResponse: true,
 									...tlsOption,
 								})) as { body: unknown; headers: Record<string, string> };
+
+								// Unpacked .msg/.eml come back as JSON instead of a binary file.
+								const ct = (fileResponse.headers['content-type'] ?? '').toLowerCase();
+								if (unpackMail && ct.includes('application/json')) {
+									const parsed = JSON.parse((fileResponse.body as Buffer).toString('utf8'));
+									returnData.push({
+										json: { success: true, count, index: d, ...doc, ...parsed },
+										pairedItem: { item: i },
+									});
+									continue;
+								}
 
 								const { fileName, mimeType } = parseDownloadedFileMeta(
 									fileResponse.headers,
@@ -1879,16 +1901,32 @@ export class TaxMetall implements INodeType {
 					} else if (operation === 'downloadFile') {
 						const syncId = this.getNodeParameter('docSyncId', i) as string;
 						const binaryPropertyName = this.getNodeParameter('docSyncBinaryProperty', i) as string;
+						const unpackMail = this.getNodeParameter('docSyncUnpackMail', i, false) as boolean;
+
+						const qs: Record<string, string> = { syncId };
+						if (unpackMail) qs.unpack = 'true';
 
 						const response = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'GET',
 							url: `${baseUrl}/api/document-file`,
-							qs: { syncId },
+							qs,
 							headers,
 							encoding: 'arraybuffer',
 							returnFullResponse: true,
 							...tlsOption,
 						})) as { body: unknown; headers: Record<string, string> };
+
+						// When unpacked, the service answers with JSON (meta/body/attachments)
+						// instead of a binary file; other formats come back as files as usual.
+						const contentType = (response.headers['content-type'] ?? '').toLowerCase();
+						if (unpackMail && contentType.includes('application/json')) {
+							const parsed = JSON.parse((response.body as Buffer).toString('utf8'));
+							returnData.push({
+								json: { syncId, ...parsed },
+								pairedItem: { item: i },
+							});
+							continue;
+						}
 
 						const { fileName, mimeType } = parseDownloadedFileMeta(
 							response.headers,
