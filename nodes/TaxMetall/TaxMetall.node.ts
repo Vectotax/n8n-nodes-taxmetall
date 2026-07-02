@@ -1809,21 +1809,45 @@ export class TaxMetall implements INodeType {
 							headers,
 							json: true,
 							...tlsOption,
-						})) as { documents?: Array<Record<string, unknown>> };
+						})) as {
+							documents?: Array<Record<string, unknown>>;
+							skipped?: Array<Record<string, unknown>>;
+						};
 
 						const documents = Array.isArray(claim.documents) ? claim.documents : [];
+						const skipped = Array.isArray(claim.skipped) ? claim.skipped : [];
 						const count = documents.length;
 
-						// 2) Nothing claimed → emit one summary item so downstream always gets feedback.
-						if (count === 0) {
+						// 2) Surface server-side skips (e.g. file_not_found) as their own items so
+						// they are NOT mistaken for an empty queue. Each skip carries skipReason and
+						// dateiname (the resolved path where the service expected the file).
+						for (let s = 0; s < skipped.length; s++) {
+							const skip = skipped[s];
 							returnData.push({
-								json: { success: false, count: 0, description: 'No new documents found' },
+								json: {
+									success: false,
+									skipped: true,
+									count,
+									description: `Document skipped: ${skip.skipReason ?? 'unknown'}`,
+									...skip,
+								},
 								pairedItem: { item: i },
 							});
+						}
+
+						// 3) Nothing claimed AND nothing skipped → the trigger queue is truly empty.
+						// (If items were skipped they were already emitted above.)
+						if (count === 0) {
+							if (skipped.length === 0) {
+								returnData.push({
+									json: { success: false, count: 0, description: 'No new documents found' },
+									pairedItem: { item: i },
+								});
+							}
 							continue;
 						}
 
-						// 3) Download the file for each claimed document.
+						// 4) Download the file for each claimed document.
 						for (let d = 0; d < documents.length; d++) {
 							const doc = documents[d];
 							const docSyncId = doc.syncId as number;
