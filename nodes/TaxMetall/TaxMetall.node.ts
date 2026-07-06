@@ -1802,17 +1802,36 @@ export class TaxMetall implements INodeType {
 						const claimBody: Record<string, unknown> = {};
 						const claimLimit = this.getNodeParameter('docSyncLimit', i) as number;
 						if (claimLimit && claimLimit > 0) claimBody.limit = claimLimit;
-						const claim = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
-							method: 'POST',
-							url: `${baseUrl}/api/check-new-documents`,
-							body: claimBody,
-							headers,
-							json: true,
-							...tlsOption,
-						})) as {
+
+						let claim: {
 							documents?: Array<Record<string, unknown>>;
 							skipped?: Array<Record<string, unknown>>;
 						};
+						try {
+							claim = (await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+								method: 'POST',
+								url: `${baseUrl}/api/check-new-documents`,
+								body: claimBody,
+								headers,
+								json: true,
+								...tlsOption,
+							})) as typeof claim;
+						} catch (claimError) {
+							// A transient DB/connection hiccup on the service must not abort the
+							// whole run — surface it as a single failed item and move on, the
+							// same resilience the per-document download loop below already has.
+							const err = claimError as { httpCode?: string | number; message?: string };
+							returnData.push({
+								json: {
+									success: false,
+									description: 'Claiming new documents failed',
+									claimError: err.message ?? String(claimError),
+									httpCode: err.httpCode,
+								},
+								pairedItem: { item: i },
+							});
+							continue;
+						}
 
 						const documents = Array.isArray(claim.documents) ? claim.documents : [];
 						const skipped = Array.isArray(claim.skipped) ? claim.skipped : [];
