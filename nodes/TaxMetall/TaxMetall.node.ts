@@ -64,6 +64,8 @@ export class TaxMetall implements INodeType {
 				offer: 'Offer',
 				article: 'Article',
 				auftrag: 'Order',
+				anfrage: 'Purchase Inquiry',
+				bestellung: 'Purchase Order',
 				eingangsrechnung: 'Purchase Invoice',
 				customer: 'Customer',
 				dms: 'DMS',
@@ -126,7 +128,9 @@ export class TaxMetall implements INodeType {
 					{ name: 'Invoice', value: 'rechnung' },
 					{ name: 'Offer', value: 'offer' },
 					{ name: 'Order', value: 'auftrag' },
+					{ name: 'Purchase Inquiry', value: 'anfrage' },
 					{ name: 'Purchase Invoice', value: 'eingangsrechnung' },
+					{ name: 'Purchase Order', value: 'bestellung' },
 					{ name: 'Statistic', value: 'statistics' },
 					{ name: 'Supplier', value: 'lieferant' },
 				],
@@ -175,6 +179,36 @@ export class TaxMetall implements INodeType {
 					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in purchase invoice' },
 					{ name: 'Search by Purchase Invoice No.', value: 'getById', action: 'Search by purchase invoice number in purchase invoice' },
 					{ name: 'Search by Supplier', value: 'getBySupplier', action: 'Search by supplier in purchase invoice' },
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Purchase Inquiry
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['anfrage'] } },
+				options: [
+					{ name: 'Create', value: 'create', action: 'Create a purchase inquiry' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in purchase inquiry' },
+					{ name: 'Search by Inquiry No.', value: 'getById', action: 'Search by inquiry number in purchase inquiry' },
+					{ name: 'Search by Supplier', value: 'getBySupplier', action: 'Search by supplier in purchase inquiry' },
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Purchase Order
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['bestellung'] } },
+				options: [
+					{ name: 'Create', value: 'create', action: 'Create a purchase order' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in purchase order' },
+					{ name: 'Search by Order No.', value: 'getById', action: 'Search by order number in purchase order' },
+					{ name: 'Search by Supplier', value: 'getBySupplier', action: 'Search by supplier in purchase order' },
 				],
 				default: 'getById',
 				noDataExpression: true,
@@ -538,6 +572,249 @@ export class TaxMetall implements INodeType {
 				default: '',
 				description: 'End date (invoice date) in format yyyy-mm-dd',
 				placeholder: '2024-12-31',
+			},
+
+			// ─── PARAMETERS: Purchase Inquiry ─────────────────────────────────────────
+			{
+				displayName: 'Inquiry Number',
+				name: 'anfrageNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['anfrage'], operation: ['getById'] } },
+				default: '',
+				description: 'Purchase inquiry number (AnfrageNr)',
+			},
+			{
+				displayName: 'Supplier Number',
+				name: 'anfrageLieferantNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['anfrage'], operation: ['getBySupplier'] } },
+				default: '',
+			},
+			{
+				displayName: 'Date From',
+				name: 'anfrageVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['anfrage'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Start date (inquiry date) in format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Date To',
+				name: 'anfrageBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['anfrage'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'End date (inquiry date) in format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+			{
+				displayName: 'Supplier Number',
+				name: 'anfrageLieferNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['anfrage'], operation: ['create'] } },
+				default: '',
+				description: 'Supplier number (liefernr) the inquiry is created for',
+			},
+			{
+				displayName: 'Positions',
+				name: 'anfragePositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['anfrage'], operation: ['create'] } },
+				description: 'One or more inquiry positions (articles with quantity)',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+								displayName: 'Article ID',
+								name: 'articleid',
+								type: 'number',
+								default: 0,
+								description: 'Numeric article ID (articleid). Alternatively specify an article number below.',
+							},
+							{
+								displayName: 'Article Number',
+								name: 'artikelnr',
+								type: 'string',
+								default: '',
+								description: 'Article number as text (artikelnr). Used when Article ID = 0.',
+							},
+							{
+								displayName: 'Quantity',
+								name: 'menge',
+								type: 'number',
+								default: 1,
+							},
+							{
+								displayName: 'Price',
+								name: 'preis',
+								type: 'number',
+								default: 0,
+								description: 'Optional expected unit purchase price (preis)',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'anfrageCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['anfrage'], operation: ['create'] } },
+				options: [
+					{
+						displayName: 'Inquiry Date',
+						name: 'anfragedatum',
+						type: 'string',
+						default: '',
+						description: 'Inquiry date in format yyyy-mm-dd. Defaults to today.',
+						placeholder: '2024-01-01',
+					},
+				],
+			},
+
+			// ─── PARAMETERS: Purchase Order ───────────────────────────────────────────
+			{
+				displayName: 'Order Number',
+				name: 'bestellungNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['bestellung'], operation: ['getById'] } },
+				default: '',
+				description: 'Purchase order number (BestellNr)',
+			},
+			{
+				displayName: 'Supplier Number',
+				name: 'bestellungLieferantNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['bestellung'], operation: ['getBySupplier'] } },
+				default: '',
+			},
+			{
+				displayName: 'Date From',
+				name: 'bestellungVon',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['bestellung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Start date (order date) in format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Date To',
+				name: 'bestellungBis',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['bestellung'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'End date (order date) in format yyyy-mm-dd',
+				placeholder: '2024-12-31',
+			},
+			{
+				displayName: 'Supplier Number',
+				name: 'bestellungLieferNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['bestellung'], operation: ['create'] } },
+				default: '',
+				description: 'Supplier number (liefernr) the order is created for',
+			},
+			{
+				displayName: 'Positions',
+				name: 'bestellungPositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['bestellung'], operation: ['create'] } },
+				description: 'One or more order positions (articles with quantity)',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+						displayName: 'Article ID',
+						name: 'articleid',
+						type: 'number',
+						default: 0,
+						description: 'Numeric article ID (articleid). Alternatively specify an article number below.',
+							},
+							{
+						displayName: 'Article Number',
+						name: 'artikelnr',
+						type: 'string',
+						default: '',
+						description: 'Article number as text (artikelnr). Used when Article ID	=	0.',
+							},
+							{
+						displayName: 'Discount	%',
+						name: 'rabatt',
+						type: 'number',
+						default: 0,
+						description: 'Position discount in percent (rabatt)',
+							},
+							{
+						displayName: 'Price',
+						name: 'preis',
+						type: 'number',
+						default: 0,
+						description: 'Unit purchase price (preis)',
+							},
+							{
+						displayName: 'Price Per',
+						name: 'preispro',
+						type: 'number',
+						default: 1,
+						description: 'Price base quantity (preispro), e.g. 100 for price per 100 units',
+							},
+							{
+						displayName: 'Quantity',
+						name: 'menge',
+						type: 'number',
+						default: 1
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'bestellungCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['bestellung'], operation: ['create'] } },
+				options: [
+					{
+						displayName: 'Book to Disposition',
+						name: 'dispo',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to book the order into disposition (writes ArtikelBestellt). Off by default.',
+					},
+					{
+						displayName: 'Order Date',
+						name: 'bestelldatum',
+						type: 'string',
+						default: '',
+						description: 'Order date in format yyyy-mm-dd. Defaults to today.',
+						placeholder: '2024-01-01',
+					},
+				],
 			},
 
 			// ─── PARAMETERS: Customer ─────────────────────────────────────────────────
@@ -1497,6 +1774,141 @@ export class TaxMetall implements INodeType {
 						json: true,
 						...tlsOption,
 					});
+
+				// ── Purchase Inquiry ───────────────────────────────────────────────────
+				} else if (resource === 'anfrage') {
+					if (operation === 'create') {
+						const positionenRaw = this.getNodeParameter('anfragePositionen', i, {}) as {
+							position?: Array<{ articleid?: number; artikelnr?: string; menge?: number; preis?: number }>;
+						};
+						const additionalFields = this.getNodeParameter('anfrageCreateAdditionalFields', i, {}) as Record<string, unknown>;
+
+						const lieferNr = this.getNodeParameter('anfrageLieferNr', i) as string;
+						if (!lieferNr) {
+							throw new NodeOperationError(this.getNode(), 'Supplier Number is required.', { itemIndex: i });
+						}
+
+						const positionsInput = positionenRaw.position ?? [];
+						if (positionsInput.length === 0) {
+							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
+						}
+						const positionen = positionsInput.map((pos, idx) => {
+							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
+							if (pos.articleid && pos.articleid !== 0) {
+								entry.articleid = pos.articleid;
+							} else if (pos.artikelnr) {
+								entry.artikelnr = pos.artikelnr;
+							} else {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Position ${idx + 1}: an Article ID or Article Number is required.`,
+									{ itemIndex: i },
+								);
+							}
+							if (pos.preis !== undefined) entry.preis = pos.preis;
+							return entry;
+						});
+						const anfrageBody: Record<string, unknown> = {
+							liefernr: lieferNr,
+							positionen,
+						};
+						if (additionalFields.anfragedatum) anfrageBody.anfragedatum = additionalFields.anfragedatum;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-purchase-inquiry`,
+							body: anfrageBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.anfragenr = this.getNodeParameter('anfrageNr', i) as string;
+						} else if (operation === 'getBySupplier') {
+							qs.liefernr = this.getNodeParameter('anfrageLieferantNr', i) as string;
+						} else if (operation === 'getByDateRange') {
+							qs.von = this.getNodeParameter('anfrageVon', i) as string;
+							qs.bis = this.getNodeParameter('anfrageBis', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-purchase-inquiries`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					}
+
+				// ── Purchase Order ─────────────────────────────────────────────────────
+				} else if (resource === 'bestellung') {
+					if (operation === 'create') {
+						const positionenRaw = this.getNodeParameter('bestellungPositionen', i, {}) as {
+							position?: Array<{ articleid?: number; artikelnr?: string; menge?: number; preis?: number; rabatt?: number; preispro?: number }>;
+						};
+						const additionalFields = this.getNodeParameter('bestellungCreateAdditionalFields', i, {}) as Record<string, unknown>;
+
+						const lieferNr = this.getNodeParameter('bestellungLieferNr', i) as string;
+						if (!lieferNr) {
+							throw new NodeOperationError(this.getNode(), 'Supplier Number is required.', { itemIndex: i });
+						}
+
+						const positionsInput = positionenRaw.position ?? [];
+						if (positionsInput.length === 0) {
+							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
+						}
+						const positionen = positionsInput.map((pos, idx) => {
+							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
+							if (pos.articleid && pos.articleid !== 0) {
+								entry.articleid = pos.articleid;
+							} else if (pos.artikelnr) {
+								entry.artikelnr = pos.artikelnr;
+							} else {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Position ${idx + 1}: an Article ID or Article Number is required.`,
+									{ itemIndex: i },
+								);
+							}
+							if (pos.preis !== undefined) entry.preis = pos.preis;
+							if (pos.rabatt !== undefined) entry.rabatt = pos.rabatt;
+							if (pos.preispro !== undefined) entry.preispro = pos.preispro;
+							return entry;
+						});
+						const bestellungBody: Record<string, unknown> = {
+							liefernr: lieferNr,
+							positionen,
+						};
+						if (additionalFields.bestelldatum) bestellungBody.bestelldatum = additionalFields.bestelldatum;
+						if (additionalFields.dispo !== undefined) bestellungBody.dispo = additionalFields.dispo;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-purchase-order`,
+							body: bestellungBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.bestellnr = this.getNodeParameter('bestellungNr', i) as string;
+						} else if (operation === 'getBySupplier') {
+							qs.liefernr = this.getNodeParameter('bestellungLieferantNr', i) as string;
+						} else if (operation === 'getByDateRange') {
+							qs.von = this.getNodeParameter('bestellungVon', i) as string;
+							qs.bis = this.getNodeParameter('bestellungBis', i) as string;
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-purchase-orders`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					}
 
 				// ── Customer ───────────────────────────────────────────────────────────
 				} else if (resource === 'customer') {

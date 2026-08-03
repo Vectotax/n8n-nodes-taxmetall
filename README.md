@@ -3,7 +3,7 @@
 [![npm version](https://img.shields.io/npm/v/@vectotaxsoftwaregmbh/n8n-nodes-taxmetall.svg)](https://www.npmjs.com/package/@vectotaxsoftwaregmbh/n8n-nodes-taxmetall)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP** and **TaxDMS** to your workflows. Read and create records across all major ERP domains — customers, articles, orders, offers, invoices, delivery notes, purchase invoices, suppliers, dunning — and run custom SQL reports and upload documents to TaxDMS, all directly from n8n.
+An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP** and **TaxDMS** to your workflows. Read and create records across all major ERP domains — customers, articles, orders, offers, invoices, delivery notes, purchase inquiries, purchase orders, purchase invoices, suppliers, dunning — and run custom SQL reports and upload documents to TaxDMS, all directly from n8n.
 
 [TaxMetall](https://www.vectotax.de) is an ERP system for metal trading and processing companies, developed by Vectotax Software GmbH.
 
@@ -24,7 +24,9 @@ An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP**
   - [Invoice](#invoice)
   - [Offer](#offer)
   - [Order](#order)
+  - [Purchase Inquiry](#purchase-inquiry)
   - [Purchase Invoice](#purchase-invoice)
+  - [Purchase Order](#purchase-order)
   - [Statistic](#statistic)
   - [Supplier](#supplier)
 - [Compatibility](#compatibility)
@@ -649,6 +651,53 @@ Lists all orders within a date range.
 
 ---
 
+### Purchase Inquiry
+
+Creates and reads purchase inquiries (Anfragen) to suppliers in TaxMetall.
+
+#### Create
+
+Creates a new purchase inquiry for a supplier with one or more article positions. For each position, either **Article ID** or **Article Number** must be provided — if both are set, Article ID takes precedence.
+
+| Field | Required | Description |
+|---|---|---|
+| Supplier Number | Yes | Supplier number (Liefernr) the inquiry is created for |
+| Positions | Yes | One or more positions. Add a row per article. |
+| › Article ID | No* | Numeric internal article ID |
+| › Article Number | No* | Article number as text — used when Article ID is `0` |
+| › Quantity | No | Quantity for the position — default: `1` |
+| › Price | No | Optional expected unit purchase price |
+| Inquiry Date | No | Inquiry date in format `yyyy-mm-dd`. Defaults to today. |
+
+*At least one of Article ID or Article Number must be provided per position.
+
+#### Search by Inquiry No.
+
+Returns a single purchase inquiry including all its line items.
+
+| Field | Required | Description |
+|---|---|---|
+| Inquiry Number | Yes | Purchase inquiry number (AnfrageNr) |
+
+#### Search by Supplier
+
+Lists all purchase inquiries for a given supplier.
+
+| Field | Required | Description |
+|---|---|---|
+| Supplier Number | Yes | Supplier number (Liefernr) |
+
+#### Search by Date Range
+
+Lists all purchase inquiries within a date range (by inquiry date).
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
 ### Purchase Invoice
 
 Reads incoming purchase invoices (Eingangsrechnungen) including their line items.
@@ -673,6 +722,56 @@ Lists all purchase invoices for a given supplier.
 #### Search by Date Range
 
 Lists all purchase invoices within a date range (by invoice date).
+
+| Field | Required | Description |
+|---|---|---|
+| Date From | Yes | Start date in format `yyyy-mm-dd` |
+| Date To | Yes | End date in format `yyyy-mm-dd` |
+
+---
+
+### Purchase Order
+
+Creates and reads purchase orders (Bestellungen) to suppliers in TaxMetall.
+
+#### Create
+
+Creates a new purchase order for a supplier with one or more article positions. For each position, either **Article ID** or **Article Number** must be provided — if both are set, Article ID takes precedence.
+
+| Field | Required | Description |
+|---|---|---|
+| Supplier Number | Yes | Supplier number (Liefernr) the order is created for |
+| Positions | Yes | One or more positions. Add a row per article. |
+| › Article ID | No* | Numeric internal article ID |
+| › Article Number | No* | Article number as text — used when Article ID is `0` |
+| › Quantity | No | Quantity for the position — default: `1` |
+| › Price | No | Unit purchase price |
+| › Discount % | No | Position discount in percent |
+| › Price Per | No | Price base quantity, e.g. `100` for price per 100 units — default: `1` |
+| Book to Disposition | No | Book the order into disposition (writes `ArtikelBestellt`). Off by default. |
+| Order Date | No | Order date in format `yyyy-mm-dd`. Defaults to today. |
+
+*At least one of Article ID or Article Number must be provided per position.
+
+#### Search by Order No.
+
+Returns a single purchase order including all its line items.
+
+| Field | Required | Description |
+|---|---|---|
+| Order Number | Yes | Purchase order number (BestellNr) |
+
+#### Search by Supplier
+
+Lists all purchase orders for a given supplier.
+
+| Field | Required | Description |
+|---|---|---|
+| Supplier Number | Yes | Supplier number (Liefernr) |
+
+#### Search by Date Range
+
+Lists all purchase orders within a date range (by order date).
 
 | Field | Required | Description |
 |---|---|---|
