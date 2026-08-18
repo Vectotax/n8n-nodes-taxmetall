@@ -17,6 +17,7 @@ An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP**
   - [Acquisition](#acquisition)
   - [Article](#article)
   - [Customer](#customer)
+  - [Customer Inquiry](#customer-inquiry)
   - [Delivery Note](#delivery-note)
   - [DMS](#dms)
   - [Document Sync (SharePoint WF1 / WF2)](#document-sync-sharepoint-wf1--wf2)
@@ -30,6 +31,8 @@ An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP**
   - [Statistic](#statistic)
   - [Supplier](#supplier)
 - [Compatibility](#compatibility)
+  - [Required TaxMetall API Service version](#required-taxmetall-api-service-version)
+  - [Finding your service version](#finding-your-service-version)
 - [Resources](#resources)
 - [License](#license)
 
@@ -64,6 +67,11 @@ Create a **TaxMetall API** credential in n8n (**Settings → Credentials → New
 | **Allow Self-Signed Certificates** | No | Disable TLS certificate validation — enable only for on-premises installations using self-signed certificates |
 
 The API key is automatically injected as the `tax-api-key` HTTP header with every request.
+
+Use the **Test** button to verify the connection. From service version 1.26.0 on, the response also
+carries the version of the service you are connected to — worth checking against
+[Required TaxMetall API Service version](#required-taxmetall-api-service-version) before you build a
+workflow around a newer resource.
 
 ---
 
@@ -225,6 +233,65 @@ Returns the customer associated with a given order number.
 
 ---
 
+### Customer Inquiry
+
+Creates and reads customer inquiries (Kundenanfragen) in TaxMetall — the request-for-quote a customer
+sends you, before it becomes an offer. Backed by the ERP tables `KundenAnfrage`, `KundenAnfragePos`
+and `KundenAnfrageHistorie`.
+
+> **Requires TaxMetall API Service 1.25.0 or newer** for all operations of this resource. See
+> [Compatibility](#compatibility).
+
+#### Create
+
+Creates a new customer inquiry with one or more positions. A position may reference an article
+(**Article ID** or **Article Number**) *or* be a pure free-text position — for a new part coming in as
+a drawing, a **Description** alone is enough. When an article is given, description, unit, drawing
+number, revision and the preferred supplier are taken from the article master.
+
+**Customer Source** decides which master the customer number refers to: `Existing Customer`
+(`Kunden_s`) or `Prospect` (`Neukunden_s`, the acquisition table also used by the Acquisition
+resource). Address and contact data are copied into the inquiry header from whichever master applies.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer Number | Yes | `kundennr` — for a prospect this is the `KontaktNr` |
+| Customer Source | Yes | `Existing Customer` (default) or `Prospect` |
+| Positions | Yes | At least one; Article ID, Article Number or Description per position |
+| Additional Fields | No | Subject, inquiry channel, customer reference, priority, due date, project, note, … |
+| History Entry | No | Optional first entry in the inquiry history |
+
+Some fields are validated against ERP selection lists (`Listen`) and are rejected with the list of
+allowed entries if they do not match: **Subject** (`KAnfrageBetreff`), **Order Type** (`Auftragsart`),
+**Estimated Value** (`Schaetzwert`) and, in the history entry, **Text**, **Type**, **Contact Type** and
+**Status**. **Inquiry Channel** and **Document Status** are free text.
+
+> **Note on Subject:** in the ERP the subject line lives in the database column `Status` — the field is
+> named *Subject* here to match what the ERP mask shows. The workflow status is **Document Status**
+> (`BelegStatus`).
+
+If positions carry a **Value**, their sum is written to the inquiry header, mirroring the ERP.
+
+#### Search by Inquiry No.
+
+Returns a single inquiry including its `positionen[]` and `historie[]`.
+
+| Field | Required | Description |
+|---|---|---|
+| Inquiry Number | Yes | `anfragenr` |
+
+#### Search by Customer No. / Search by Email / Search by Date Range
+
+Return a list of inquiry headers. **Search by Email** matches the email address stored on the inquiry,
+which makes it useful for assigning an incoming mail to an existing inquiry.
+
+| Field | Required | Description |
+|---|---|---|
+| Customer Number / Email / Date From + Date To | Yes | Depending on the operation |
+| Additional Filters | No | Document status, order type, priority, inquiry channel, project, offer number, customer reference, customer source, limit |
+
+---
+
 ### Delivery Note
 
 Reads delivery notes (Lieferscheine) including their line items.
@@ -281,6 +348,9 @@ Connects the TaxMetall document pocket (Dokutasche) with SharePoint through the 
 - **WF2 — Import** (SharePoint / mail → TaxMetall): create a document (typically an `.eml` built by the service) in TaxMetall and write a closing audit entry, with optional deduplication by mail message ID.
 
 The service stores the resulting SharePoint URL under `Payload.sharePoint.mainUrl` and, for WF2, the mail ID under `Payload.email.messageId`.
+
+> **Requires TaxMetall API Service 1.20.3 or newer**; the **Unpack MSG File** operation requires
+> **1.23.2 or newer**. See [Compatibility](#compatibility).
 
 #### Check New Documents
 
@@ -376,7 +446,7 @@ WF2: creates a document in TaxMetall from mail data. When no existing file path 
 | Purchase Order (Bestellung) | `Bestellung_s` | Article (Artikel) | `Artikel_s` |
 | Inquiry (Anfrage) | `Anfrage_s` | Project (Projekt) | `Projekt` |
 | Customer (Kunde) | `Kunden_s` | Supplier (Lieferant) | `Liefer_s` |
-| Purchase Invoice (ER) | `ER` |  |  |
+| Purchase Invoice (ER) | `ER` | Customer Inquiry (Kundenanfrage) | `Kundenanfrage` |
 
 **Email Fields** (collection — used to build the `.eml`):
 
@@ -655,6 +725,9 @@ Lists all orders within a date range.
 
 Creates and reads purchase inquiries (Anfragen) to suppliers in TaxMetall.
 
+> **Requires TaxMetall API Service 1.24.0 or newer** for all operations of this resource. See
+> [Compatibility](#compatibility).
+
 #### Create
 
 Creates a new purchase inquiry for a supplier with one or more article positions. For each position, either **Article ID** or **Article Number** must be provided — if both are set, Article ID takes precedence.
@@ -700,7 +773,11 @@ Lists all purchase inquiries within a date range (by inquiry date).
 
 ### Purchase Invoice
 
-Reads incoming purchase invoices (Eingangsrechnungen) including their line items.
+Reads incoming purchase invoices (Eingangsrechnungen) including their line items, and creates them
+either from individual fields or from an EN 16931 e-invoice file.
+
+> The Search operations work with **TaxMetall API Service 1.10.0 or newer**. The **Create**
+> operation requires **1.25.0 or newer**. See [Compatibility](#compatibility).
 
 #### Search by Purchase Invoice No.
 
@@ -733,6 +810,9 @@ Lists all purchase invoices within a date range (by invoice date).
 ### Purchase Order
 
 Creates and reads purchase orders (Bestellungen) to suppliers in TaxMetall.
+
+> **Requires TaxMetall API Service 1.24.0 or newer** for all operations of this resource. See
+> [Compatibility](#compatibility).
 
 #### Create
 
@@ -877,6 +957,45 @@ Returns all suppliers linked to a specific article via the supplier-article assi
 | n8n | >= 1.0.0 |
 | Node.js | >= 18 |
 | n8n Nodes API | 1 |
+
+### Required TaxMetall API Service version
+
+Every operation of this node calls an endpoint of the TaxMetall API Service running on your
+premises. Those endpoints were added over time, so an operation only works if the service on
+the other end is new enough. The node does **not** check this for you: calling an operation
+your service does not know yet returns HTTP 404 with `Endpoint nicht gefunden`.
+
+Newer service versions never remove endpoints, so a service that is at or above the highest
+version listed below covers everything in this package.
+
+| Resource / Operation | Endpoint | Requires service |
+|---|---|---|
+| Acquisition, Article, Customer, Delivery Note, DMS, Dunning, Invoice, Offer, Order, Statistic, Supplier — all operations | (base set) | 1.10.0 |
+| Purchase Invoice — Search operations | `/api/get-purchase-invoices` | 1.10.0 |
+| Document Sync — Check New Documents, Download Document File, Check & Download New Documents, Report Transfer Status, Create Document | `/api/check-new-documents`, `/api/document-file`, `/api/sharepoint-transfer-status`, `/api/create-new-dokument` | 1.20.3 |
+| Document Sync — Unpack MSG File | `/api/unpack-msg` | 1.23.2 |
+| Purchase Inquiry — all operations | `/api/get-purchase-inquiries`, `/api/create-purchase-inquiry` | 1.24.0 |
+| Purchase Order — all operations | `/api/get-purchase-orders`, `/api/create-purchase-order` | 1.24.0 |
+| Purchase Invoice — Create | `/api/create-purchase-invoice` | 1.25.0 |
+| Customer Inquiry — all operations | `/api/get-customer-inquiries`, `/api/create-customer-inquiry` | 1.25.0 |
+| Workflow — all operations | `/api/get-workflows`, `/api/execute-workflow` | 1.25.0 |
+
+### Finding your service version
+
+From service version **1.26.0** on, `/api/validate` reports the version it is running, so the
+**Test** button on the TaxMetall API credential shows it directly. You can also read it with:
+
+```bash
+curl -H "tax-api-key: YOUR_KEY" https://your-host:8443/api/validate
+```
+
+```json
+{ "success": true, "message": "Connected", "version": "1.26.0", "mandant": 1, "mandant_name": "Example GmbH", "db_connected": true }
+```
+
+Older services answer the same call without a `version` field. In that case the version is in
+the first lines of the service log file, and in **Windows → Programs and Features** next to
+*TaxMetall API Service*.
 
 ---
 

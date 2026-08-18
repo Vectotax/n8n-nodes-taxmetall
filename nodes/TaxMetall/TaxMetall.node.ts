@@ -24,6 +24,39 @@ interface StatisticsListResponse {
 	statistics: StatisticEntry[];
 }
 
+interface WorkflowEntry {
+	id: string;
+	name: string;
+}
+
+interface WorkflowListResponse {
+	success: boolean;
+	count: number;
+	data: WorkflowEntry[];
+}
+
+interface WorkflowVariableEntry {
+	name: string;
+	beschreibung: string;
+}
+
+/**
+ * Detail response of GET /api/get-workflows?id=… — unlike the list it also
+ * reports whether the workflow may be started through the API at all and which
+ * variables it declares.
+ */
+interface WorkflowDetailResponse {
+	success: boolean;
+	data: {
+		id: string;
+		name: string;
+		startbar: boolean;
+		erster_block: string;
+		grund: string;
+		variablen: WorkflowVariableEntry[];
+	};
+}
+
 /**
  * Derives the file name and MIME type of a downloaded document-sync file from the
  * response headers. Shared by the "Download Document File" and "Check & Download
@@ -68,6 +101,7 @@ export class TaxMetall implements INodeType {
 				bestellung: 'Purchase Order',
 				eingangsrechnung: 'Purchase Invoice',
 				customer: 'Customer',
+				kundenanfrage: 'Customer Inquiry',
 				dms: 'DMS',
 				documentSync: 'Document Sync',
 				lieferant: 'Supplier',
@@ -75,6 +109,7 @@ export class TaxMetall implements INodeType {
 				mahnung: 'Dunning',
 				rechnung: 'Invoice',
 				statistics: 'Statistic',
+				workflow: 'Workflow',
 			}[$parameter["resource"]] ?? $parameter["resource"])
 			+ ' · ' +
 			({
@@ -120,6 +155,7 @@ export class TaxMetall implements INodeType {
 					{ name: 'Acquisition', value: 'akquise' },
 					{ name: 'Article', value: 'article' },
 					{ name: 'Customer', value: 'customer' },
+					{ name: 'Customer Inquiry', value: 'kundenanfrage' },
 					{ name: 'Delivery Note', value: 'lieferschein' },
 					// eslint-disable-next-line n8n-nodes-base/node-param-resource-with-plural-option
 					{ name: 'DMS', value: 'dms' },
@@ -133,6 +169,7 @@ export class TaxMetall implements INodeType {
 					{ name: 'Purchase Order', value: 'bestellung' },
 					{ name: 'Statistic', value: 'statistics' },
 					{ name: 'Supplier', value: 'lieferant' },
+					{ name: 'Workflow', value: 'workflow' },
 				],
 				default: 'article',
 			},
@@ -176,6 +213,7 @@ export class TaxMetall implements INodeType {
 				type: 'options',
 				displayOptions: { show: { resource: ['eingangsrechnung'] } },
 				options: [
+					{ name: 'Create', value: 'create', action: 'Create a purchase invoice' },
 					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in purchase invoice' },
 					{ name: 'Search by Purchase Invoice No.', value: 'getById', action: 'Search by purchase invoice number in purchase invoice' },
 					{ name: 'Search by Supplier', value: 'getBySupplier', action: 'Search by supplier in purchase invoice' },
@@ -194,6 +232,22 @@ export class TaxMetall implements INodeType {
 					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in purchase inquiry' },
 					{ name: 'Search by Inquiry No.', value: 'getById', action: 'Search by inquiry number in purchase inquiry' },
 					{ name: 'Search by Supplier', value: 'getBySupplier', action: 'Search by supplier in purchase inquiry' },
+				],
+				default: 'getById',
+				noDataExpression: true,
+			},
+			// Customer Inquiry
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['kundenanfrage'] } },
+				options: [
+					{ name: 'Create', value: 'create', action: 'Create a customer inquiry' },
+					{ name: 'Search by Customer No.', value: 'getByCustomer', action: 'Search by customer number in customer inquiry' },
+					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in customer inquiry' },
+					{ name: 'Search by Email', value: 'getByEmail', action: 'Search by email in customer inquiry' },
+					{ name: 'Search by Inquiry No.', value: 'getById', action: 'Search by inquiry number in customer inquiry' },
 				],
 				default: 'getById',
 				noDataExpression: true,
@@ -335,6 +389,19 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['statistics'] } },
 				options: [
 					{ name: 'Execute', value: 'execute', action: 'Execute a statistics report' },
+				],
+				default: 'execute',
+				noDataExpression: true,
+			},
+			// Workflow
+			{
+				displayName: 'Operation',
+				name: 'operation',
+				type: 'options',
+				displayOptions: { show: { resource: ['workflow'] } },
+				options: [
+					{ name: 'Execute', value: 'execute', action: 'Execute a workflow' },
+					{ name: 'Get Many', value: 'getAll', action: 'Get many workflows' },
 				],
 				default: 'execute',
 				noDataExpression: true,
@@ -574,6 +641,364 @@ export class TaxMetall implements INodeType {
 				placeholder: '2024-12-31',
 			},
 
+			// ─── PARAMETERS: Purchase Invoice — Create ────────────────────────────────
+			{
+				displayName: 'Input Mode',
+				name: 'erCreateModus',
+				type: 'options',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'] } },
+				options: [
+					{ name: 'E-Invoice (XRechnung / ZUGFeRD XML)', value: 'erechnung', description: 'The service reads an EN 16931 invoice file' },
+					{ name: 'Parameters', value: 'parameter', description: 'Header and positions are supplied as fields' },
+				],
+				default: 'parameter',
+				description: 'Whether to supply the invoice data as fields or as an e-invoice file',
+			},
+			{
+				displayName: 'Invoice XML',
+				name: 'erCreateXml',
+				type: 'string',
+				required: true,
+				typeOptions: { rows: 4 },
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['erechnung'] } },
+				default: '',
+				description: 'The e-invoice file as Base64 or plain XML. Pure XML only — extract the embedded XML from a ZUGFeRD PDF beforehand.',
+			},
+			{
+				displayName: 'Discount Handling',
+				name: 'erCreateRabattModus',
+				type: 'options',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['erechnung'] } },
+				options: [
+					{
+						name: 'As Positions',
+						value: 'positionen',
+						description: 'Each document-level allowance and charge becomes its own invoice line, keeping its own VAT rate',
+					},
+					{
+						name: 'On Header',
+						value: 'kopf',
+						description: 'Allowances go to the absolute discount, charges to freight. Rejected when the invoice mixes VAT rates.',
+					},
+				],
+				default: 'positionen',
+				description: 'Where document-level allowances (BT-107) and charges (BT-108) are placed',
+			},
+			{
+				displayName: 'Supplier Number',
+				name: 'erCreateLieferNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'] } },
+				default: '',
+				description: 'Supplier number (liefernr) the invoice belongs to',
+			},
+			{
+				displayName: 'Supplier Number (Optional)',
+				name: 'erCreateLieferNrOptional',
+				type: 'string',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['erechnung'] } },
+				default: '',
+				description: 'Leave empty to let the service identify the supplier from the file (VAT ID, then IBAN, then exact name)',
+			},
+			{
+				displayName: 'Purchase Invoice Number',
+				name: 'erCreateErNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'] } },
+				default: '',
+				description: 'The supplier\'s invoice number (ernr), max. 30 characters. There is no number range — it must be supplied.',
+			},
+			{
+				displayName: 'Invoice Date',
+				name: 'erCreateDatum',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'] } },
+				default: '',
+				description: 'Invoice date in format yyyy-mm-dd',
+				placeholder: '2024-01-01',
+			},
+			{
+				displayName: 'Positions',
+				name: 'erCreatePositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'] } },
+				description: 'One or more invoice positions. At least one is required.',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+						displayName: 'Account',
+						name: 'konto',
+						type: 'string',
+						default: '',
+						description: 'Optional G/L account. Otherwise from the article master, then the header.',
+							},
+							{
+						displayName: 'Article Number',
+						name: 'artikelnr',
+						type: 'string',
+						default: '',
+						description: 'Optional. If given, the article must exist	—	otherwise the request is rejected. Leave empty for a free-text line.',
+							},
+							{
+						displayName: 'Cost Center',
+						name: 'kostenstellenNr',
+						type: 'number',
+						default: 0
+							},
+							{
+						displayName: 'Description',
+						name: 'bezeichnung',
+						type: 'string',
+						default: '',
+						description: 'Required unless it can be taken from the article master',
+							},
+							{
+						displayName: 'Discount	%',
+						name: 'rabatt',
+						type: 'number',
+						default: 0
+							},
+							{
+						displayName: 'Price Per',
+						name: 'preisPro',
+						type: 'number',
+						default: 1,
+						description: 'Price base quantity (preis_pro), e.g. 100 for a price per 100 units',
+							},
+							{
+						displayName: 'Purchase Order No.',
+						name: 'bestellNr',
+						type: 'number',
+						default: 0,
+						description: 'Documentary reference to the purchase order	—	triggers no stock valuation',
+							},
+							{
+						displayName: 'Purchase Order Position',
+						name: 'bestellPos',
+						type: 'number',
+						default: 0
+							},
+							{
+						displayName: 'Quantity',
+						name: 'menge',
+						type: 'number',
+						default: 1
+							},
+							{
+						displayName: 'Service Date',
+						name: 'leistungsdatum',
+						type: 'string',
+						default: '',
+						description: 'Service date in format yyyy-mm-dd. Otherwise inherited from the header.',
+						placeholder: '2024-01-01',
+							},
+							{
+						displayName: 'Total Net',
+						name: 'gesamtNetto',
+						type: 'number',
+						default: 0,
+						description: 'Optional. If set, the line amount is taken as-is instead of being calculated from quantity and price.',
+							},
+							{
+						displayName: 'Unit Price',
+						name: 'preis',
+						type: 'number',
+						default: 0
+							},
+							{
+						displayName: 'VAT Key',
+						name: 'mwstSchluessel',
+						type: 'number',
+						default: 0,
+						description: 'Optional VAT key (MwStNr) to look the rate up from',
+							},
+							{
+						displayName: 'VAT Rate	%',
+						name: 'mwstSatz',
+						type: 'number',
+						default: 0,
+						description: 'Optional. Otherwise derived from the VAT key, the article master or the header.',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Validate Only',
+				name: 'erCreateNurPruefen',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'] } },
+				default: false,
+				description: 'Whether to run all checks and the full calculation without creating anything. Useful to verify a file before committing it.',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'erCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'] } },
+				description: 'Optional header fields. In e-invoice mode these override the values read from the file.',
+				options: [
+					{
+						displayName: 'Booking Text',
+						name: 'buchtext',
+						type: 'string',
+						default: '',
+						description: 'Short booking text (max. 32 characters).',
+					},
+					{
+						displayName: 'Business Unit',
+						name: 'geschbereichnr',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Cash Discount %',
+						name: 'skonto',
+						type: 'number',
+						default: 0,
+						description: 'Otherwise taken from the supplier master',
+					},
+					{
+						displayName: 'Cash Discount Days',
+						name: 'skontotage',
+						type: 'number',
+						default: 0,
+						description: 'Otherwise taken from the supplier master',
+					},
+					{
+						displayName: 'Cost Center',
+						name: 'kostenstellennr',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Currency',
+						name: 'wkz',
+						type: 'string',
+						default: '',
+						description: 'Otherwise taken from the supplier master',
+					},
+					{
+						displayName: 'Delivery Note No.',
+						name: 'erlfsnr',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Document Type',
+						name: 'typ',
+						type: 'options',
+						options: [
+							{ name: 'Purchase Invoice', value: 1 },
+							{ name: 'Credit Note', value: 2 },
+							{ name: 'Down Payment Request', value: 3 },
+							{ name: 'Final Invoice', value: 4 },
+							{ name: 'Debit Note', value: 5 },
+						],
+						default: 1,
+						description: 'Credit notes (2) must carry a negative total. In e-invoice mode this is derived from BT-3.',
+					},
+					{
+						displayName: 'Freight / Postage',
+						name: 'frachtkosten',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Freight With VAT',
+						name: 'frachtMitMwst',
+						type: 'boolean',
+						default: true,
+						description: 'Whether freight and transport insurance are subject to VAT',
+					},
+					{
+						displayName: 'G/L Account',
+						name: 'sachkonto',
+						type: 'string',
+						default: '',
+						description: 'Otherwise the expense account from the supplier master',
+					},
+					{
+						displayName: 'Net Days',
+						name: 'nettotage',
+						type: 'number',
+						default: 0,
+						description: 'Payment term in days. Otherwise from the supplier master; in e-invoice mode from the due date in the file.',
+					},
+					{
+						displayName: 'Note',
+						name: 'bemerkung',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Overall Discount Amount',
+						name: 'rabattBetrag',
+						type: 'number',
+						default: 0,
+						description: 'Absolute discount. Rejected when the invoice mixes VAT rates.',
+					},
+					{
+						displayName: 'Project Name',
+						name: 'projektname',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Project Number',
+						name: 'projektnr',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Purchase Invoice Number',
+						name: 'ernr',
+						type: 'string',
+						default: '',
+						description: 'Overrides the invoice number read from the e-invoice file',
+					},
+					{
+						displayName: 'Purchase Order No.',
+						name: 'bestellnr',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Service Date',
+						name: 'leistungsdatum',
+						type: 'string',
+						default: '',
+						description: 'Service date in format yyyy-mm-dd',
+						placeholder: '2024-01-01',
+					},
+					{
+						displayName: 'VAT Key',
+						name: 'mwstSchluessel',
+						type: 'number',
+						default: 0,
+						description: 'Otherwise taken from the supplier master',
+					},
+					{
+						displayName: 'VAT Rate %',
+						name: 'mwst',
+						type: 'number',
+						default: 0,
+						description: 'Otherwise derived from the VAT key or the positions',
+					},
+				],
+			},
+
 			// ─── PARAMETERS: Purchase Inquiry ─────────────────────────────────────────
 			{
 				displayName: 'Inquiry Number',
@@ -681,6 +1106,432 @@ export class TaxMetall implements INodeType {
 						default: '',
 						description: 'Inquiry date in format yyyy-mm-dd. Defaults to today.',
 						placeholder: '2024-01-01',
+					},
+				],
+			},
+
+			// ─── PARAMETERS: Customer Inquiry ───────────────────────────
+			{
+				displayName: 'Inquiry Number',
+				name: 'kundenanfrageNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['getById'] } },
+				default: '',
+				description: 'Customer inquiry number (anfragenr). Returns the inquiry including positions and history.',
+			},
+			{
+				displayName: 'Customer Number',
+				name: 'kundenanfrageKundenNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['getByCustomer'] } },
+				default: '',
+			},
+			{
+				displayName: 'Email',
+				name: 'kundenanfrageEmail',
+				type: 'string',
+				required: true,
+				placeholder: 'name@email.com',
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['getByEmail'] } },
+				default: '',
+				description: 'Email address stored on the inquiry. Useful to match an incoming mail to an existing inquiry.',
+			},
+			{
+				displayName: 'Date From',
+				name: 'kundenanfrageVon',
+				type: 'string',
+				required: true,
+				placeholder: '2024-01-01',
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'Start date (inquiry date) in format yyyy-mm-dd',
+			},
+			{
+				displayName: 'Date To',
+				name: 'kundenanfrageBis',
+				type: 'string',
+				required: true,
+				placeholder: '2024-12-31',
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['getByDateRange'] } },
+				default: '',
+				description: 'End date (inquiry date) in format yyyy-mm-dd',
+			},
+			{
+				displayName: 'Additional Filters',
+				name: 'kundenanfrageFilters',
+				type: 'collection',
+				placeholder: 'Add filter',
+				default: {},
+				displayOptions: {
+					show: { resource: ['kundenanfrage'], operation: ['getByCustomer', 'getByDateRange', 'getByEmail'] },
+				},
+				options: [
+					{
+						displayName: 'Customer Reference',
+						name: 'kunden_anfragenr',
+						type: 'string',
+						default: '',
+						description: 'The customer own inquiry/RFQ number stored on the inquiry',
+					},
+					{
+						displayName: 'Customer Source',
+						name: 'kunden_source',
+						type: 'options',
+						options: [
+							{ name: 'Existing Customer', value: 'Kunden' },
+							{ name: 'Prospect', value: 'Neukunden' },
+						],
+						default: 'Kunden',
+						description: 'Whether the customer number refers to the customer master or the acquisition master',
+					},
+					{
+						displayName: 'Document Status',
+						name: 'belegstatus',
+						type: 'string',
+						default: '',
+						description: 'Document status of the inquiry, e.g. Offen or Abgelehnt',
+					},
+					{
+						displayName: 'Inquiry Channel',
+						name: 'anfrageweg',
+						type: 'string',
+						default: '',
+						description: 'How the inquiry arrived, e.g. E-Mail or Telefon',
+					},
+					{
+						displayName: 'Limit',
+						name: 'limit',
+						type: 'number',
+						typeOptions: { minValue: 1 },
+						default: 50,
+						description: 'Max number of results to return',
+					},
+					{
+						displayName: 'Offer Number',
+						name: 'angebotnr',
+						type: 'string',
+						default: '',
+						description: 'Number of the offer created from the inquiry',
+					},
+					{
+						displayName: 'Order Type',
+						name: 'auftragsart',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Priority',
+						name: 'prio',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Project Number',
+						name: 'projektnr',
+						type: 'string',
+						default: '',
+					},
+				],
+			},
+			{
+				displayName: 'Customer Number',
+				name: 'kundenanfrageCreateKundenNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				default: '',
+				description: 'Customer number (kundennr) the inquiry is created for. For a prospect this is the KontaktNr; set Customer Source accordingly.',
+			},
+			{
+				displayName: 'Customer Source',
+				name: 'kundenanfrageCreateSource',
+				type: 'options',
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				options: [
+					{ name: 'Existing Customer', value: 'Kunden' },
+					{ name: 'Prospect', value: 'Neukunden' },
+				],
+				default: 'Kunden',
+				description: 'Whether the customer number refers to the customer master or the acquisition master',
+			},
+			{
+				displayName: 'Positions',
+				name: 'kundenanfragePositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				description: 'One or more inquiry positions. A position without an article is allowed as long as it has a description.',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+						displayName: 'Article ID',
+						name: 'articleid',
+						type: 'number',
+						default: 0,
+						description: 'Numeric article ID (articleid). Alternatively specify an article number below.',
+							},
+							{
+						displayName: 'Article Number',
+						name: 'artikelnr',
+						type: 'string',
+						default: '',
+						description: 'Article number as text (artikelnr). Used when Article ID	=	0.',
+							},
+							{
+						displayName: 'Customer Article Number',
+						name: 'kundenartikelnr',
+						type: 'string',
+						default: '',
+							},
+							{
+						displayName: 'Description',
+						name: 'bezeichnung',
+						type: 'string',
+						default: '',
+						description: 'Free text description. Required for a position without an article, e.g. a new part from a drawing.',
+							},
+							{
+						displayName: 'Drawing Number',
+						name: 'zeichnungnr',
+						type: 'string',
+						default: '',
+							},
+							{
+						displayName: 'Info Text',
+						name: 'infotext',
+						type: 'string',
+						default: '',
+							},
+							{
+						displayName: 'Quantity',
+						name: 'menge',
+						type: 'number',
+						default: 1
+							},
+							{
+						displayName: 'Requested Delivery Date',
+						name: 'liefertermin',
+						type: 'string',
+						placeholder: '2024-01-01',
+						default: '',
+						description: 'Requested delivery date in format yyyy-mm-dd',
+							},
+							{
+						displayName: 'Revision Number',
+						name: 'revisionsnr',
+						type: 'string',
+						default: '',
+							},
+							{
+						displayName: 'Unit',
+						name: 'mengeneinheit',
+						type: 'string',
+						default: '',
+							},
+							{
+						displayName: 'Value',
+						name: 'wert',
+						type: 'number',
+						default: 0,
+						description: 'Estimated position value. The sum over all positions is written to the inquiry header.',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'kundenanfrageCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				options: [
+					{
+						displayName: 'Commission Number',
+						name: 'komissionsnr',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Contact Person',
+						name: 'anfrageperson',
+						type: 'string',
+						default: '',
+						description: 'Name of the contact person on the customer side',
+					},
+					{
+						displayName: 'Contact Person Number',
+						name: 'anfragepersonnr',
+						type: 'number',
+						default: 0,
+						description: 'Contact person number (PartnerNr). Name, email and phone are then taken from the contact record.',
+					},
+					{
+						displayName: 'Customer Reference',
+						name: 'kunden_anfragenr',
+						type: 'string',
+						default: '',
+						description: 'The customer own inquiry/RFQ number',
+					},
+					{
+						displayName: 'Document Status',
+						name: 'belegstatus',
+						type: 'string',
+						default: '',
+						description: 'Document status of the inquiry, e.g. Offen',
+					},
+					{
+						displayName: 'Due Date',
+						name: 'abgabetermin',
+						type: 'string',
+						placeholder: '2024-01-01',
+						default: '',
+						description: 'Date the quotation is due, in format yyyy-mm-dd',
+					},
+					{
+						displayName: 'Email',
+						name: 'emailadresse',
+						type: 'string',
+						placeholder: 'name@email.com',
+						default: '',
+						description: 'Overrides the email address taken from the customer master',
+					},
+					{
+						displayName: 'Estimated Value',
+						name: 'schaetzwert',
+						type: 'string',
+						default: '',
+						description: 'Must match an entry of the ERP selection list Schaetzwert',
+					},
+					{
+						displayName: 'Inquiry Channel',
+						name: 'anfrageweg',
+						type: 'string',
+						default: '',
+						description: 'How the inquiry arrived, e.g. E-Mail or Telefon',
+					},
+					{
+						displayName: 'Inquiry Date',
+						name: 'anfragedatum',
+						type: 'string',
+						placeholder: '2024-01-01',
+						default: '',
+						description: 'Inquiry date in format yyyy-mm-dd. Defaults to today.',
+					},
+					{
+						displayName: 'Inquiry Received',
+						name: 'anfrageeingang',
+						type: 'string',
+						placeholder: '2024-01-01',
+						default: '',
+						description: 'Date the inquiry was received, in format yyyy-mm-dd',
+					},
+					{
+						displayName: 'Note',
+						name: 'notiz',
+						type: 'string',
+						typeOptions: { rows: 4 },
+						default: '',
+					},
+					{
+						displayName: 'Order Type',
+						name: 'auftragsart',
+						type: 'string',
+						default: '',
+						description: 'Must match an entry of the ERP selection list Auftragsart',
+					},
+					{
+						displayName: 'Priority',
+						name: 'prio',
+						type: 'number',
+						default: 0,
+					},
+					{
+						displayName: 'Project Name',
+						name: 'projektname',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Project Number',
+						name: 'projektnr',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Subject',
+						name: 'betreff',
+						type: 'string',
+						default: '',
+						description: 'Subject line of the inquiry. Must match an entry of the ERP selection list KAnfrageBetreff.',
+					},
+				],
+			},
+			{
+				displayName: 'History Entry',
+				name: 'kundenanfrageHistorie',
+				type: 'collection',
+				placeholder: 'Add history field',
+				default: {},
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				description: 'Optional first entry in the inquiry history. Leave empty to skip.',
+				options: [
+					{
+						displayName: 'Contact Person',
+						name: 'ansprechpartner',
+						type: 'string',
+						default: '',
+					},
+					{
+						displayName: 'Contact Type',
+						name: 'kontaktart',
+						type: 'string',
+						default: '',
+						description: 'Must match an entry of the ERP selection list VerlaufKontakt',
+					},
+					{
+						displayName: 'Follow-Up Date',
+						name: 'wiedervorlage',
+						type: 'string',
+						placeholder: '2024-01-01',
+						default: '',
+						description: 'Follow-up date in format yyyy-mm-dd',
+					},
+					{
+						displayName: 'Info',
+						name: 'info',
+						type: 'string',
+						typeOptions: { rows: 3 },
+						default: '',
+					},
+					{
+						displayName: 'Status',
+						name: 'status',
+						type: 'string',
+						default: '',
+						description: 'Must match an entry of the ERP selection list VerlaufStatus',
+					},
+					{
+						displayName: 'Text',
+						name: 'text',
+						type: 'string',
+						default: '',
+						description: 'Must match an entry of the ERP selection list Verlauftext',
+					},
+					{
+						displayName: 'Type',
+						name: 'typ',
+						type: 'string',
+						default: '',
+						description: 'Must match an entry of the ERP selection list Verlauftyp',
 					},
 				],
 			},
@@ -1337,6 +2188,62 @@ export class TaxMetall implements INodeType {
 				],
 			},
 
+			// ─── PARAMETERS: Workflow ─────────────────────────────────────────────────
+			{
+				displayName: 'Workflow Name or ID',
+				name: 'workflowId',
+				type: 'options',
+				typeOptions: { loadOptionsMethod: 'getWorkflows' },
+				default: '',
+				required: true,
+				noDataExpression: true,
+				displayOptions: { show: { resource: ['workflow'], operation: ['execute'] } },
+				description: 'Select the TaxMetall workflow to start. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+			},
+			{
+				// The available variables differ per workflow, so the name field is a
+				// dropdown that reloads whenever another workflow is selected.
+				displayName: 'Variables',
+				name: 'workflowVariables',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add variable',
+				default: {},
+				displayOptions: { show: { resource: ['workflow'], operation: ['execute'] } },
+				description: 'Initial values handed to the workflow. Only variables declared in the selected workflow are accepted.',
+				options: [
+					{
+						displayName: 'Variable',
+						name: 'variable',
+						values: [
+							{
+								displayName: 'Name or ID',
+								name: 'name',
+								type: 'options',
+								typeOptions: { loadOptionsMethod: 'getWorkflowVariables', loadOptionsDependsOn: ['workflowId'] },
+								default: '',
+								description: 'Variable declared in the selected workflow. Choose from the list, or specify an ID using an <a href="https://docs.n8n.io/code/expressions/">expression</a>.',
+							},
+							{
+								displayName: 'Value',
+								name: 'value',
+								type: 'string',
+								default: '',
+								description: 'Value to set before the workflow starts',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Strict Variable Check',
+				name: 'workflowStrict',
+				type: 'boolean',
+				default: true,
+				displayOptions: { show: { resource: ['workflow'], operation: ['execute'] } },
+				description: 'Whether unknown variable names make the call fail. Turn off to silently ignore them, which is how the ERP behaves.',
+			},
+
 			// ─── PARAMETERS: DMS ──────────────────────────────────────────────────────────
 			{
 				displayName: 'Data (JSON)',
@@ -1449,6 +2356,7 @@ export class TaxMetall implements INodeType {
 				options: [
 					{ name: 'Article', value: 'Artikel_s' },
 					{ name: 'Customer', value: 'Kunden_s' },
+					{ name: 'Customer Inquiry', value: 'Kundenanfrage' },
 					{ name: 'Delivery Note', value: 'Lieferschein_s' },
 					{ name: 'Inquiry', value: 'Anfrage_s' },
 					{ name: 'Invoice', value: 'Rechnung_s' },
@@ -1619,6 +2527,62 @@ export class TaxMetall implements INodeType {
 						: 'No parameters required',
 				}));
 			},
+
+			async getWorkflows(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const credentials = await this.getCredentials('taxMetallApi');
+				const baseUrl = credentials.baseUrl as string;
+				const loadTlsOption = credentials.allowSelfSignedCertificates === true
+					? { skipSslCertificateValidation: true as const }
+					: {};
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+					method: 'GET',
+					url: `${baseUrl}/api/get-workflows`,
+					json: true,
+					...loadTlsOption,
+				}) as WorkflowListResponse;
+				if (!response.success || !Array.isArray(response.data)) return [];
+				return response.data.map((wf) => ({
+					name: wf.name,
+					value: wf.id,
+				}));
+			},
+
+			async getWorkflowVariables(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
+				const workflowId = this.getCurrentNodeParameter('workflowId') as string;
+				if (!workflowId) return [];
+
+				const credentials = await this.getCredentials('taxMetallApi');
+				const baseUrl = credentials.baseUrl as string;
+				const loadTlsOption = credentials.allowSelfSignedCertificates === true
+					? { skipSslCertificateValidation: true as const }
+					: {};
+				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+					method: 'GET',
+					url: `${baseUrl}/api/get-workflows`,
+					qs: { id: workflowId },
+					json: true,
+					...loadTlsOption,
+				}) as WorkflowDetailResponse;
+				if (!response.success || !response.data || !Array.isArray(response.data.variablen)) return [];
+
+				// Every TaxMetall workflow carries the same twelve document-number
+				// variables. They are pushed to the bottom so the ones specific to the
+				// selected workflow are visible without scrolling.
+				const boilerplate = new Set([
+					'AngebotNr', 'AnfrageNr', 'AuftragNr', 'BestellungNr', 'DateinameDMS', 'erstelltAus',
+					'KundeNr', 'LieferNr', 'LieferscheinNr', 'newUserID', 'Position', 'RechnungNr',
+				]);
+				const rank = (name: string) => (boilerplate.has(name) ? 1 : 0);
+
+				return response.data.variablen
+					.slice()
+					.sort((a, b) => rank(a.name) - rank(b.name) || a.name.localeCompare(b.name))
+					.map((v) => ({
+						name: v.name,
+						value: v.name,
+						description: v.beschreibung || undefined,
+					}));
+			},
 		},
 	};
 
@@ -1690,6 +2654,105 @@ export class TaxMetall implements INodeType {
 						});
 					}
 
+				// ── Customer Inquiry ────────────────────────────────────────
+				} else if (resource === 'kundenanfrage') {
+					if (operation === 'create') {
+						const positionenRaw = this.getNodeParameter('kundenanfragePositionen', i, {}) as {
+							position?: Array<{
+								articleid?: number;
+								artikelnr?: string;
+								bezeichnung?: string;
+								menge?: number;
+								mengeneinheit?: string;
+								zeichnungnr?: string;
+								revisionsnr?: string;
+								kundenartikelnr?: string;
+								infotext?: string;
+								wert?: number;
+								liefertermin?: string;
+							}>;
+						};
+						const additionalFields = this.getNodeParameter('kundenanfrageCreateAdditionalFields', i, {}) as Record<string, unknown>;
+						const historie = this.getNodeParameter('kundenanfrageHistorie', i, {}) as Record<string, unknown>;
+
+						const kundenNr = this.getNodeParameter('kundenanfrageCreateKundenNr', i) as string;
+						if (!kundenNr) {
+							throw new NodeOperationError(this.getNode(), 'Customer Number is required.', { itemIndex: i });
+						}
+
+						const positionsInput = positionenRaw.position ?? [];
+						if (positionsInput.length === 0) {
+							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
+						}
+						const positionen = positionsInput.map((pos, idx) => {
+							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
+							if (pos.articleid && pos.articleid !== 0) {
+								entry.articleid = pos.articleid;
+							} else if (pos.artikelnr) {
+								entry.artikelnr = pos.artikelnr;
+							} else if (!pos.bezeichnung) {
+								// Freitextposition ohne Artikel braucht wenigstens eine Bezeichnung
+								throw new NodeOperationError(
+									this.getNode(),
+									`Position ${idx + 1}: an Article ID, Article Number or Description is required.`,
+									{ itemIndex: i },
+								);
+							}
+							if (pos.bezeichnung) entry.bezeichnung = pos.bezeichnung;
+							if (pos.mengeneinheit) entry.mengeneinheit = pos.mengeneinheit;
+							if (pos.zeichnungnr) entry.zeichnungnr = pos.zeichnungnr;
+							if (pos.revisionsnr) entry.revisionsnr = pos.revisionsnr;
+							if (pos.kundenartikelnr) entry.kundenartikelnr = pos.kundenartikelnr;
+							if (pos.infotext) entry.infotext = pos.infotext;
+							if (pos.wert) entry.wert = pos.wert;
+							if (pos.liefertermin) entry.liefertermin = pos.liefertermin;
+							return entry;
+						});
+
+						const kundenanfrageBody: Record<string, unknown> = {
+							kundennr: kundenNr,
+							kunden_source: this.getNodeParameter('kundenanfrageCreateSource', i) as string,
+							positionen,
+						};
+						Object.assign(kundenanfrageBody, additionalFields);
+						if (Object.keys(historie).length > 0) kundenanfrageBody.historie = historie;
+
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-customer-inquiry`,
+							body: kundenanfrageBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const qs: Record<string, string> = {};
+						if (operation === 'getById') {
+							qs.anfragenr = this.getNodeParameter('kundenanfrageNr', i) as string;
+						} else {
+							if (operation === 'getByCustomer') {
+								qs.kundennr = this.getNodeParameter('kundenanfrageKundenNr', i) as string;
+							} else if (operation === 'getByEmail') {
+								qs.email = this.getNodeParameter('kundenanfrageEmail', i) as string;
+							} else if (operation === 'getByDateRange') {
+								qs.von = this.getNodeParameter('kundenanfrageVon', i) as string;
+								qs.bis = this.getNodeParameter('kundenanfrageBis', i) as string;
+							}
+							const filters = this.getNodeParameter('kundenanfrageFilters', i, {}) as Record<string, unknown>;
+							for (const [key, value] of Object.entries(filters)) {
+								if (value !== undefined && value !== null && value !== '') qs[key] = String(value);
+							}
+						}
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-customer-inquiries`,
+							qs,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					}
+
 				// ── Order ──────────────────────────────────────────────────────────────
 				} else if (resource === 'auftrag') {
 					if (operation === 'create') {
@@ -1754,6 +2817,109 @@ export class TaxMetall implements INodeType {
 					}
 
 				// ── Purchase Invoice ───────────────────────────────────────────────────
+				} else if (resource === 'eingangsrechnung' && operation === 'create') {
+					const modus = this.getNodeParameter('erCreateModus', i) as string;
+					const additionalFields = this.getNodeParameter('erCreateAdditionalFields', i, {}) as Record<string, unknown>;
+					const nurPruefen = this.getNodeParameter('erCreateNurPruefen', i, false) as boolean;
+					const erBody: Record<string, unknown> = {};
+
+					if (modus === 'erechnung') {
+						const xml = (this.getNodeParameter('erCreateXml', i) as string ?? '').trim();
+						if (!xml) {
+							throw new NodeOperationError(this.getNode(), 'Invoice XML is required in e-invoice mode.', { itemIndex: i });
+						}
+						erBody.modus = 'erechnung';
+						erBody.xml = xml;
+						erBody.rabatt_modus = this.getNodeParameter('erCreateRabattModus', i, 'positionen') as string;
+						const lieferNr = (this.getNodeParameter('erCreateLieferNrOptional', i, '') as string ?? '').trim();
+						if (lieferNr) erBody.liefernr = lieferNr;
+					} else {
+						const lieferNr = (this.getNodeParameter('erCreateLieferNr', i) as string ?? '').trim();
+						if (!lieferNr) {
+							throw new NodeOperationError(this.getNode(), 'Supplier Number is required.', { itemIndex: i });
+						}
+						const erNr = (this.getNodeParameter('erCreateErNr', i) as string ?? '').trim();
+						if (!erNr) {
+							throw new NodeOperationError(this.getNode(), 'Purchase Invoice Number is required.', { itemIndex: i });
+						}
+						erBody.liefernr = lieferNr;
+						erBody.ernr = erNr;
+						erBody.datum = this.getNodeParameter('erCreateDatum', i) as string;
+
+						const positionenRaw = this.getNodeParameter('erCreatePositionen', i, {}) as {
+							position?: Array<{
+								artikelnr?: string; bezeichnung?: string; menge?: number; preis?: number;
+								preisPro?: number; rabatt?: number; gesamtNetto?: number; mwstSatz?: number;
+								mwstSchluessel?: number; konto?: string; kostenstellenNr?: number;
+								bestellNr?: number; bestellPos?: number; leistungsdatum?: string;
+							}>;
+						};
+						const positionsInput = positionenRaw.position ?? [];
+						if (positionsInput.length === 0) {
+							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
+						}
+						erBody.positionen = positionsInput.map((pos, idx) => {
+							if (!pos.artikelnr && !pos.bezeichnung) {
+								throw new NodeOperationError(
+									this.getNode(),
+									`Position ${idx + 1}: an Article Number or a Description is required.`,
+									{ itemIndex: i },
+								);
+							}
+							const entry: Record<string, unknown> = {};
+							if (pos.artikelnr) entry.artikelnr = pos.artikelnr;
+							if (pos.bezeichnung) entry.bezeichnung = pos.bezeichnung;
+							if (pos.menge !== undefined) entry.menge = pos.menge;
+							if (pos.preis !== undefined) entry.preis = pos.preis;
+							if (pos.preisPro) entry.preis_pro = pos.preisPro;
+							if (pos.rabatt) entry.rabatt = pos.rabatt;
+							if (pos.gesamtNetto) entry.gesamt_netto = pos.gesamtNetto;
+							if (pos.mwstSatz) entry.mwst_satz = pos.mwstSatz;
+							if (pos.mwstSchluessel) entry.mwst_schluessel = pos.mwstSchluessel;
+							if (pos.konto) entry.konto = pos.konto;
+							if (pos.kostenstellenNr) entry.kostenstellennr = pos.kostenstellenNr;
+							if (pos.bestellNr) entry.bestellnr = pos.bestellNr;
+							if (pos.bestellPos) entry.bestellpos = pos.bestellPos;
+							if (pos.leistungsdatum) entry.leistungsdatum = pos.leistungsdatum;
+							return entry;
+						});
+					}
+
+					if (nurPruefen) erBody.nur_pruefen = true;
+
+					// Kopffelder: leere Werte werden bewusst nicht gesendet, damit im
+					// E-Rechnungsmodus die Angaben aus der Datei bestehen bleiben.
+					if (additionalFields.ernr) erBody.ernr = additionalFields.ernr;
+					if (additionalFields.typ) erBody.typ = additionalFields.typ;
+					if (additionalFields.leistungsdatum) erBody.leistungsdatum = additionalFields.leistungsdatum;
+					if (additionalFields.nettotage !== undefined) erBody.nettotage = additionalFields.nettotage;
+					if (additionalFields.skontotage !== undefined) erBody.skontotage = additionalFields.skontotage;
+					if (additionalFields.skonto !== undefined) erBody.skonto = additionalFields.skonto;
+					if (additionalFields.mwstSchluessel) erBody.mwst_schluessel = additionalFields.mwstSchluessel;
+					if (additionalFields.mwst !== undefined) erBody.mwst = additionalFields.mwst;
+					if (additionalFields.sachkonto) erBody.sachkonto = additionalFields.sachkonto;
+					if (additionalFields.wkz) erBody.wkz = additionalFields.wkz;
+					if (additionalFields.frachtkosten) erBody.frachtkosten = additionalFields.frachtkosten;
+					if (additionalFields.rabattBetrag) erBody.rabatt_betrag = additionalFields.rabattBetrag;
+					if (additionalFields.frachtMitMwst !== undefined) erBody.fracht_mit_mwst = additionalFields.frachtMitMwst;
+					if (additionalFields.bestellnr) erBody.bestellnr = additionalFields.bestellnr;
+					if (additionalFields.projektnr) erBody.projektnr = additionalFields.projektnr;
+					if (additionalFields.projektname) erBody.projektname = additionalFields.projektname;
+					if (additionalFields.kostenstellennr) erBody.kostenstellennr = additionalFields.kostenstellennr;
+					if (additionalFields.geschbereichnr) erBody.geschbereichnr = additionalFields.geschbereichnr;
+					if (additionalFields.buchtext) erBody.buchtext = additionalFields.buchtext;
+					if (additionalFields.bemerkung) erBody.bemerkung = additionalFields.bemerkung;
+					if (additionalFields.erlfsnr) erBody.erlfsnr = additionalFields.erlfsnr;
+
+					responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+						method: 'POST',
+						url: `${baseUrl}/api/create-purchase-invoice`,
+						body: erBody,
+						headers,
+						json: true,
+						...tlsOption,
+					});
+
 				} else if (resource === 'eingangsrechnung') {
 					const qs: Record<string, string> = {};
 					if (operation === 'getById') {
@@ -2138,6 +3304,39 @@ export class TaxMetall implements INodeType {
 						...tlsOption,
 						timeout: 120000,
 					});
+
+				// ── Workflow ───────────────────────────────────────────────────────────
+				} else if (resource === 'workflow') {
+					if (operation === 'getAll') {
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'GET',
+							url: `${baseUrl}/api/get-workflows`,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else {
+						const workflowId = this.getNodeParameter('workflowId', i) as string;
+						const strict = this.getNodeParameter('workflowStrict', i) as boolean;
+						const variableCollection = this.getNodeParameter('workflowVariables', i) as {
+							variable?: Array<{ name: string; value: string }>;
+						};
+
+						const variablen: Record<string, string> = {};
+						for (const entry of variableCollection.variable ?? []) {
+							if (!entry.name) continue;
+							variablen[entry.name] = entry.value ?? '';
+						}
+
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/execute-workflow`,
+							body: { workflowid: workflowId, variablen, strikt: strict },
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					}
 
 				// ── Acquisition ────────────────────────────────────────────────────────
 				} else if (resource === 'akquise') {
