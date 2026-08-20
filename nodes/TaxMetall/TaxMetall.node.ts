@@ -2691,7 +2691,7 @@ export class TaxMetall implements INodeType {
 							} else if (pos.artikelnr) {
 								entry.artikelnr = pos.artikelnr;
 							} else if (!pos.bezeichnung) {
-								// Freitextposition ohne Artikel braucht wenigstens eine Bezeichnung
+								// Free-text position without an article requires at least a description.
 								throw new NodeOperationError(
 									this.getNode(),
 									`Position ${idx + 1}: an Article ID, Article Number or Description is required.`,
@@ -2887,8 +2887,8 @@ export class TaxMetall implements INodeType {
 
 					if (nurPruefen) erBody.nur_pruefen = true;
 
-					// Kopffelder: leere Werte werden bewusst nicht gesendet, damit im
-					// E-Rechnungsmodus die Angaben aus der Datei bestehen bleiben.
+					// Header fields: empty values are deliberately not sent so that in e-invoice mode
+					// the values from the file remain unchanged.
 					if (additionalFields.ernr) erBody.ernr = additionalFields.ernr;
 					if (additionalFields.typ) erBody.typ = additionalFields.typ;
 					if (additionalFields.leistungsdatum) erBody.leistungsdatum = additionalFields.leistungsdatum;

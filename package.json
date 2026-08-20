@@ -1,6 +1,6 @@
 {
   "name": "@vectotaxsoftwaregmbh/n8n-nodes-taxmetall",
-  "version": "1.26.1",
+  "version": "1.26.2",
   "description": "n8n community node for TaxMetall ERP — read customers, articles, orders, offers, invoices, delivery notes, purchase inquiries, purchase orders, purchase invoices, suppliers, dunning, and execute statistics queries via the TaxMetall REST API.",
   "license": "MIT",
   "homepage": "https://www.vectotax.de",
@@ -25,7 +25,8 @@
     "build": "n8n-node build",
     "build:watch": "tsc --watch",
     "dev": "n8n-node dev",
-    "lint": "n8n-node lint",
+    "lint": "npm run lint:comments && n8n-node lint",
+    "lint:comments": "eslint --no-config-lookup --quiet -c eslint.comments.config.mjs nodes credentials",
     "lint:fix": "n8n-node lint --fix"
   },
   "files": [
@@ -45,6 +46,7 @@
   },
   "devDependencies": {
     "@n8n/node-cli": "0.23.0",
+    "@typescript-eslint/parser": "8.62.0",
     "n8n-workflow": "*",
     "eslint": "9.32.0",
     "prettier": "3.6.2",
