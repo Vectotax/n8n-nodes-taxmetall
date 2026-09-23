@@ -2159,6 +2159,38 @@ export class TaxMetall implements INodeType {
 				description: 'End date of a comparison period (SQL parameter: VergleichBis)',
 			},
 			{
+				displayName: 'Only Open',
+				name: 'statChkNO',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Whether to only include open items, if supported by the selected report (SQL parameter: ChkNO)',
+			},
+			{
+				displayName: 'Without Blanket Orders',
+				name: 'statChkOR',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Whether to exclude blanket orders (Rahmenauftraege), if supported by the selected report (SQL parameter: ChkOR)',
+			},
+			{
+				displayName: 'Not Printed',
+				name: 'statChkND',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Whether to only include documents not yet printed, if supported by the selected report (SQL parameter: ChkND)',
+			},
+			{
+				displayName: 'Not Emailed',
+				name: 'statChkNM',
+				type: 'boolean',
+				default: false,
+				displayOptions: { show: { resource: ['statistics'], operation: ['execute'] } },
+				description: 'Whether to only include documents not yet emailed, if supported by the selected report (SQL parameter: ChkNM)',
+			},
+			{
 				displayName: 'Additional Parameters',
 				name: 'statWeitereParameter',
 				type: 'collection',
@@ -3287,6 +3319,13 @@ export class TaxMetall implements INodeType {
 					if (vergleichVon) parameters['VergleichVon'] = vergleichVon.substring(0, 10);
 					const vergleichBis = this.getNodeParameter('statVergleichBis', i) as string;
 					if (vergleichBis) parameters['VergleichBis'] = vergleichBis.substring(0, 10);
+
+					// Always sent (not just when checked), so an unset checkbox explicitly
+					// means "off" rather than being silently omitted.
+					parameters['ChkNO'] = this.getNodeParameter('statChkNO', i) as boolean ? '1' : '0';
+					parameters['ChkOR'] = this.getNodeParameter('statChkOR', i) as boolean ? '1' : '0';
+					parameters['ChkND'] = this.getNodeParameter('statChkND', i) as boolean ? '1' : '0';
+					parameters['ChkNM'] = this.getNodeParameter('statChkNM', i) as boolean ? '1' : '0';
 
 					const weitereParameter = this.getNodeParameter('statWeitereParameter', i) as Record<string, string | number>;
 					for (const [key, value] of Object.entries(weitereParameter)) {

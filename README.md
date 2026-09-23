@@ -866,7 +866,7 @@ Executes pre-configured SQL reports stored in TaxMetall and returns the results 
 
 The available reports are loaded dynamically from the API and presented in a dropdown — each option shows the report name and which parameters it requires.
 
-> **Note:** Only reports of type **Individual** (Individuell) and **Business Cockpit** (BC) are supported. Static system reports (Statisch) are not available because their SQL is not stored in the database.
+> **Note:** Reports of type **Individual** (Individuell) and **Business Cockpit** (BC) are supported, plus a small, fixed set of built-in reports the service exposes explicitly ("n.g. …" not-printed/not-emailed reports). Most other static system reports (Statisch) are not available because their SQL is not stored in the database and lives in the ERP client instead.
 
 #### Execute
 
@@ -877,6 +877,10 @@ The available reports are loaded dynamically from the API and presented in a dro
 | Date To | No | End of the reporting period (SQL parameter: `DatumBis`) |
 | Comparison From | No | Start of an optional comparison period (SQL parameter: `VergleichVon`) |
 | Comparison To | No | End of an optional comparison period (SQL parameter: `VergleichBis`) |
+| Only Open | No | Whether to only include open items, if supported by the selected report (SQL parameter: `ChkNO`) |
+| Without Blanket Orders | No | Whether to exclude blanket orders (Rahmenauftraege), if supported by the selected report (SQL parameter: `ChkOR`) |
+| Not Printed | No | Whether to only include documents not yet printed, if supported by the selected report (SQL parameter: `ChkND`) |
+| Not Emailed | No | Whether to only include documents not yet emailed, if supported by the selected report (SQL parameter: `ChkNM`) |
 
 **Additional Parameters** (collection — add only what the report requires):
 
