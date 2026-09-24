@@ -19,7 +19,7 @@ An [n8n](https://n8n.io/) community node package that connects **TaxMetall ERP**
   - [Customer](#customer)
   - [Customer Inquiry](#customer-inquiry)
   - [Delivery Note](#delivery-note)
-  - [DMS](#dms)
+  - [Document Management](#document-management)
   - [Document Sync (SharePoint WF1 / WF2)](#document-sync-sharepoint-wf1--wf2)
   - [Dunning](#dunning)
   - [Invoice](#invoice)
@@ -64,7 +64,7 @@ Create a **TaxMetall API** credential in n8n (**Settings → Credentials → New
 | **Base URL** | Yes | URL of your TaxMetall API service, e.g. `https://api.example.com:8443` |
 | **API Key** | Yes | The `tax-api-key` configured in your TaxMetall API service |
 | **Use ngrok Tunnel** | No | Enable if your TaxMetall instance is accessed via an ngrok tunnel — adds the `ngrok-skip-browser-warning` header to bypass the ngrok browser interstitial page |
-| **Allow Self-Signed Certificates** | No | Disable TLS certificate validation — enable only for on-premises installations using self-signed certificates |
+| **Ignore SSL Issues (Insecure)** | No | Disable TLS certificate validation — enable only for on-premises installations using self-signed certificates. Named **Allow Self-Signed Certificates** up to 1.27.0; after updating to 1.27.1 or later it has to be switched on again once (see the changelog). |
 
 The API key is automatically injected as the `tax-api-key` HTTP header with every request.
 
@@ -323,7 +323,7 @@ Lists all delivery notes within a date range.
 
 ---
 
-### DMS
+### Document Management
 
 Uploads files to the **TaxDMS** document management system (Vectotax Software GmbH).
 
@@ -974,7 +974,7 @@ version listed below covers everything in this package.
 
 | Resource / Operation | Endpoint | Requires service |
 |---|---|---|
-| Acquisition, Article, Customer, Delivery Note, DMS, Dunning, Invoice, Offer, Order, Statistic, Supplier — all operations | (base set) | 1.10.0 |
+| Acquisition, Article, Customer, Delivery Note, Document Management, Dunning, Invoice, Offer, Order, Statistic, Supplier — all operations | (base set) | 1.10.0 |
 | Purchase Invoice — Search operations | `/api/get-purchase-invoices` | 1.10.0 |
 | Document Sync — Check New Documents, Download Document File, Check & Download New Documents, Report Transfer Status, Create Document | `/api/check-new-documents`, `/api/document-file`, `/api/sharepoint-transfer-status`, `/api/create-new-dokument` | 1.20.3 |
 | Document Sync — Unpack MSG File | `/api/unpack-msg` | 1.23.2 |

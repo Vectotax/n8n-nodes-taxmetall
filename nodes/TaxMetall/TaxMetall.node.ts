@@ -82,11 +82,40 @@ function parseDownloadedFileMeta(
 	return { fileName, mimeType };
 }
 
+const TLS_CERTIFICATE_ERROR_CODES = [
+	'DEPTH_ZERO_SELF_SIGNED_CERT',
+	'SELF_SIGNED_CERT_IN_CHAIN',
+	'UNABLE_TO_VERIFY_LEAF_SIGNATURE',
+	'UNABLE_TO_GET_ISSUER_CERT_LOCALLY',
+	'UNABLE_TO_GET_ISSUER_CERT',
+	'CERT_UNTRUSTED',
+	'ERR_TLS_CERT_ALTNAME_INVALID',
+];
+
+const TLS_CERTIFICATE_HINT =
+	'The TLS certificate of the TaxMetall service was rejected. If your installation uses a self-signed certificate, ' +
+	'enable "Ignore SSL Issues (Insecure)" in the TaxMetall API credentials. This toggle was renamed in 1.27.1 ' +
+	'(formerly "Allow Self-Signed Certificates") and has to be switched on again once after the update.';
+
+/**
+ * Returns the credential hint when the error is a rejected TLS certificate, otherwise undefined.
+ * Checks the error, its cause and the message, because n8n wraps request errors differently per version.
+ */
+function getTlsCertificateHint(error: unknown): string | undefined {
+	const err = error as { code?: unknown; message?: unknown; cause?: { code?: unknown; message?: unknown } };
+	const text = [err?.code, err?.message, err?.cause?.code, err?.cause?.message]
+		.filter((part) => typeof part === 'string')
+		.join(' ');
+	return TLS_CERTIFICATE_ERROR_CODES.some((code) => text.includes(code)) || /self[- ]signed certificate/i.test(text)
+		? TLS_CERTIFICATE_HINT
+		: undefined;
+}
+
 export class TaxMetall implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'TaxMetall ERP',
 		name: 'taxMetall',
-		icon: 'file:TaxMetallLogo.svg',
+		icon: { light: 'file:TaxMetallLogo_light.svg', dark: 'file:TaxMetallLogo_dark.svg' },
 		group: ['transform'],
 		version: 1,
 		description:
@@ -102,7 +131,7 @@ export class TaxMetall implements INodeType {
 				eingangsrechnung: 'Purchase Invoice',
 				customer: 'Customer',
 				kundenanfrage: 'Customer Inquiry',
-				dms: 'DMS',
+				dms: 'Document Management',
 				documentSync: 'Document Sync',
 				lieferant: 'Supplier',
 				lieferschein: 'Delivery Note',
@@ -157,8 +186,7 @@ export class TaxMetall implements INodeType {
 					{ name: 'Customer', value: 'customer' },
 					{ name: 'Customer Inquiry', value: 'kundenanfrage' },
 					{ name: 'Delivery Note', value: 'lieferschein' },
-					// eslint-disable-next-line n8n-nodes-base/node-param-resource-with-plural-option
-					{ name: 'DMS', value: 'dms' },
+					{ name: 'Document Management', value: 'dms' },
 					{ name: 'Document Sync', value: 'documentSync' },
 					{ name: 'Dunning', value: 'mahnung' },
 					{ name: 'Invoice', value: 'rechnung' },
@@ -311,14 +339,14 @@ export class TaxMetall implements INodeType {
 				default: 'getById',
 				noDataExpression: true,
 			},
-			// DMS
+			// Document Management
 			{
 				displayName: 'Operation',
 				name: 'operation',
 				type: 'options',
 				displayOptions: { show: { resource: ['dms'] } },
 				options: [
-					{ name: 'Create File', value: 'createFile', action: 'Create a file in DMS' },
+					{ name: 'Create File', value: 'createFile', action: 'Create a file in document management' },
 				],
 				default: 'createFile',
 				noDataExpression: true,
@@ -2276,7 +2304,7 @@ export class TaxMetall implements INodeType {
 				description: 'Whether unknown variable names make the call fail. Turn off to silently ignore them, which is how the ERP behaves.',
 			},
 
-			// ─── PARAMETERS: DMS ──────────────────────────────────────────────────────────
+			// ─── PARAMETERS: DOCUMENT MANAGEMENT ──────────────────────────────────────────
 			{
 				displayName: 'Data (JSON)',
 				name: 'dmsData',
@@ -2541,7 +2569,7 @@ export class TaxMetall implements INodeType {
 			async getStatistics(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 				const credentials = await this.getCredentials('taxMetallApi');
 				const baseUrl = credentials.baseUrl as string;
-				const loadTlsOption = credentials.allowSelfSignedCertificates === true
+				const loadTlsOption = credentials.ignoreSslIssues === true
 					? { skipSslCertificateValidation: true as const }
 					: {};
 				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
@@ -2563,7 +2591,7 @@ export class TaxMetall implements INodeType {
 			async getWorkflows(this: ILoadOptionsFunctions): Promise<INodePropertyOptions[]> {
 				const credentials = await this.getCredentials('taxMetallApi');
 				const baseUrl = credentials.baseUrl as string;
-				const loadTlsOption = credentials.allowSelfSignedCertificates === true
+				const loadTlsOption = credentials.ignoreSslIssues === true
 					? { skipSslCertificateValidation: true as const }
 					: {};
 				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
@@ -2585,7 +2613,7 @@ export class TaxMetall implements INodeType {
 
 				const credentials = await this.getCredentials('taxMetallApi');
 				const baseUrl = credentials.baseUrl as string;
-				const loadTlsOption = credentials.allowSelfSignedCertificates === true
+				const loadTlsOption = credentials.ignoreSslIssues === true
 					? { skipSslCertificateValidation: true as const }
 					: {};
 				const response = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
@@ -2637,7 +2665,7 @@ export class TaxMetall implements INodeType {
 				}
 
 				const baseUrl = credentials.baseUrl as string;
-				const tlsOption = credentials.allowSelfSignedCertificates === true
+				const tlsOption = credentials.ignoreSslIssues === true
 					? { skipSslCertificateValidation: true as const }
 					: {};
 
@@ -3477,6 +3505,7 @@ export class TaxMetall implements INodeType {
 									description: 'Claiming new documents failed',
 									claimError: err.message ?? String(claimError),
 									httpCode: err.httpCode,
+									...(getTlsCertificateHint(claimError) ? { hint: getTlsCertificateHint(claimError) } : {}),
 								},
 								pairedItem: { item: i },
 							});
@@ -3779,7 +3808,7 @@ export class TaxMetall implements INodeType {
 						});
 					}
 
-				// ── DMS ────────────────────────────────────────────────────────────────────
+				// ── Document Management ────────────────────────────────────────────────────
 				} else if (resource === 'dms') {
 					if (operation === 'createFile') {
 						const dmsData = this.getNodeParameter('dmsData', i) as string;
@@ -3805,11 +3834,15 @@ export class TaxMetall implements INodeType {
 				const executionData = this.helpers.returnJsonArray(responseData);
 				returnData.push(...executionData.map((item) => ({ ...item, pairedItem: { item: i } })));
 			} catch (error) {
+				const tlsHint = getTlsCertificateHint(error);
 				if (this.continueOnFail()) {
-					returnData.push({ json: { error: (error as Error).message }, pairedItem: { item: i } });
+					returnData.push({
+						json: { error: (error as Error).message, ...(tlsHint ? { hint: tlsHint } : {}) },
+						pairedItem: { item: i },
+					});
 					continue;
 				}
-				throw new NodeApiError(this.getNode(), error as JsonObject);
+				throw new NodeApiError(this.getNode(), error as JsonObject, tlsHint ? { description: tlsHint } : {});
 			}
 		}
 		return [returnData];

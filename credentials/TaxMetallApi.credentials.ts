@@ -9,7 +9,7 @@ export class TaxMetallApi implements ICredentialType {
 	name = 'taxMetallApi';
 	displayName = 'TaxMetall API';
 	documentationUrl = 'https://www.vectotax.de';
-	icon = 'file:TaxMetallLogo.svg' as const;
+	icon = { light: 'file:TaxMetallLogo_light.svg', dark: 'file:TaxMetallLogo_dark.svg' } as const;
 
 	authenticate: IAuthenticateGeneric = {
 		type: 'generic',
@@ -27,7 +27,7 @@ export class TaxMetallApi implements ICredentialType {
 			headers: {
 				'tax-api-key': '={{$credentials.apiKey}}',
 			},
-			skipSslCertificateValidation: '={{$credentials.allowSelfSignedCertificates}}',
+			skipSslCertificateValidation: '={{$credentials.ignoreSslIssues}}',
 		},
 	};
 
@@ -56,13 +56,12 @@ export class TaxMetallApi implements ICredentialType {
 			default: false,
 			description: 'Whether your TaxMetall instance is accessed via an ngrok tunnel. Enable this if you use ngrok instead of a custom domain.',
 		},
-		// eslint-disable-next-line @n8n/community-nodes/credential-password-field
 		{
-			displayName: 'Allow Self-Signed Certificates',
-			name: 'allowSelfSignedCertificates',
+			displayName: 'Ignore SSL Issues (Insecure)',
+			name: 'ignoreSslIssues',
 			type: 'boolean',
 			default: false,
-			description: 'Whether to disable TLS certificate validation — enable only for on-premises installations using self-signed certificates',
+			description: 'Whether to disable TLS certificate validation — enable only for on-premises installations using self-signed certificates. Replaces the former "Allow Self-Signed Certificates" toggle (renamed in 1.27.1), which has to be switched on again once.',
 		},
 	];
 }
