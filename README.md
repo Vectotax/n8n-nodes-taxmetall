@@ -79,6 +79,23 @@ workflow around a newer resource.
 
 The **TaxMetall ERP** node covers all major TaxMetall domains. Select a **Resource** and then an **Operation** to configure the node.
 
+#### Entering positions
+
+Every operation that creates a document with positions (Offer, Order, Customer Inquiry, Purchase Inquiry, Purchase Order and Purchase Invoice in *Parameters* mode) has a **Positions Input** field:
+
+- **Manual List** (default): one row per position, as in earlier versions.
+- **From JSON**: the positions come as a JSON list, typically from a previous node via an expression such as `{{ $json.positions }}`. The list may also be wrapped in an object under `positionen`, `positions`, `items` or `lines`.
+- Offer additionally offers **Single Article**, the default for workflows created before multiple positions existed.
+
+The JSON keys are the ones of the TaxMetall API (for example `artikelnr`, `menge`, `preis`). From service version 1.27.0 on, the service also accepts keys in any letter case and common English alternatives: `articleNumber`/`sku` → `artikelnr`, `articleId` → `articleid`, `quantity`/`qty` → `menge`, `price`/`unitPrice` → `preis`, `pricePer` → `preispro`, `discount` → `rabatt`, `description` → `bezeichnung`, `deliveryDate` → `liefertermin`, `unit` → `mengeneinheit`.
+
+```json
+[
+  { "artikelnr": "A-100045", "menge": 5 },
+  { "articleNumber": "A-100046", "quantity": 2 }
+]
+```
+
 ---
 
 ### Acquisition
@@ -643,16 +660,25 @@ Manages offers (Angebote) in TaxMetall.
 
 #### Create
 
-Creates a new offer for a customer with one article position. Either **Article ID** or **Article Number** must be provided — if both are set, Article ID takes precedence.
+Creates a new offer for a customer with one or more article positions. Prices, discounts, surcharges and the offer totals are determined and calculated like in TaxMetall. The whole offer is created in one transaction: if a position fails, no offer is created.
+
+> Multiple positions require **TaxMetall API Service 1.27.0 or newer**. Older services only accept **Single Article**. See [Compatibility](#compatibility).
 
 | Field | Required | Description |
 |---|---|---|
 | Customer ID | Yes | Customer number (Kundennr) |
-| Article ID | No* | Numeric internal article ID |
-| Article Number | No* | Article number as text — used when Article ID is `0` |
-| Quantity | No | Quantity for the position — default: `1` |
+| Positions Input | No | **Single Article** (default, as in earlier versions), **Multiple Positions** (one row per article) or **From JSON** (a list from a previous node). |
+| Article ID | No* | *Single Article:* numeric internal article ID |
+| Article Number | No* | *Single Article:* article number as text, used when Article ID is `0` |
+| Quantity | No | *Single Article:* quantity, default `1` |
+| Positions | For *Multiple Positions* | One row per article with Article ID or Article Number, Quantity (default `1`) and optionally Price and Discount % (`0` = determined by TaxMetall) |
+| Positions (JSON) | For *From JSON* | List of objects with `articleid` or `artikelnr` and optional `menge`, e.g. `[{"artikelnr": "A-100045", "menge": 5}]`. An object holding the list under `positionen` works too. |
+| Rounding (additional field) | No | **Commercial (Like TaxMetall)** (default) or **Mathematical (Half to Even)** |
+| Rounding Factor (additional field) | No | Like the TaxMetall workstation setting `RF`. `100` = two decimals (default) |
 
-*At least one of Article ID or Article Number must be provided.
+*Per position either Article ID or Article Number. If both are set, Article ID takes precedence.
+
+The response contains `angebotNr`, `positionen` (position number, article, quantity, prices) and the offer `summen`.
 
 #### Search by Offer No.
 
@@ -696,11 +722,57 @@ Creates a new order for a customer with one or more article positions. For each 
 | › Article ID | No* | Numeric internal article ID |
 | › Article Number | No* | Article number as text — used when Article ID is `0` |
 | › Quantity | No | Quantity for the position — default: `1` |
+| › Price | No | Unit price that replaces the price determined by TaxMetall. `0` = determined by TaxMetall. Requires service 1.27.0. |
+| › Discount % | No | Discount that replaces the discount determined by TaxMetall. `0` = determined by TaxMetall; send `"rabatt": 0` via JSON input to force no discount. Requires service 1.27.0. |
 | Create Calculation | No | Freeze the bill of materials and create the calculation (work plan / material) for each position. Off by default. |
+| Rounding (additional field) | No | **Commercial (Like TaxMetall)** (default) or **Mathematical (Half to Even)** |
+| Rounding Factor (additional field) | No | Like the TaxMetall workstation setting `RF`. `100` = two decimals (default) |
+
+From service version 1.27.0 on, position prices and order totals are calculated like in TaxMetall (commercial rounding, weight-based prices, surcharges, document surcharges, packaging and freight costs of the delivery terms). The response additionally contains the order `summen`.
 
 *At least one of Article ID or Article Number must be provided per position.
 
 Each created position is marked in the `Text1` field with the note *"Erstellt durch TaxMetall API Service"*.
+
+#### Create From Offer
+
+Transfers an existing offer (Angebot) into a new order, like the dialog *"Uebergabe: Angebot in
+Auftrag"* in TaxMetall. Header data, positions with their quantities, prices, delivery dates and
+texts, surcharges, payment terms, the approval chain and the back reference in the offer are
+handled the same way TaxMetall does it, and the calculation matches TaxMetall to the cent. Price
+tiers (Staffelpreise) of an offer position are copied to the order position as well.
+
+> **Requires TaxMetall API Service 1.27.0 or newer.** See [Compatibility](#compatibility).
+
+| Field | Required | Description |
+|---|---|---|
+| Offer Number | Yes | Number of the offer (Angebotnr) |
+| Position Selection | No | **Manual List** (default): enter positions below. **Accepted in Offer**: transfer the positions whose accept checkbox (Akzeptieren) is set in the offer, like TaxMetall. **From JSON**: take the positions from a JSON list, e.g. from a previous node. |
+| Positions (JSON) | For *From JSON* | A list of position numbers (`[1, 2, 3]`) or objects with `positionsnr` (also `position`, `pos`), optional `gruppennr` (`group`) and optional `menge` (`quantity`, `qty`). An object holding the list under `positionen`, `positions` or `items` works too. Example: `[{"positionsnr": 1}, {"positionsnr": 2, "menge": 10}]` |
+| Positions | For *Manual List* | One row per offer position. |
+| › Position Number | Yes | Position number in the offer |
+| › Group Number | No | Offer group, only needed if the position number exists in several groups. `0` = any group. |
+| › Quantity | No | Quantity for the order position. `0` = quantity from the offer. A different quantity recalculates the position like a quantity change in the TaxMetall order. |
+| Customer Order Number | No* | The customer's own purchase order number (Bestell-Nummer), e.g. `PO-4711`. It is stored in the order. |
+| Customer Order Date | No | Order date of the customer, `yyyy-mm-dd`. Empty = today. |
+| Transfer Intro Text | No | Copy the intro text of the offer. Off = default intro text for orders. |
+| Transfer Closing Text | No | Copy the closing text of the offer. Off = default closing text for orders. |
+| Transfer Personnel Number | No | Keep the employee of the offer (default on). Off = service employee from the service configuration. |
+| Transfer Attention Of | No | Copy contact person, partner number and salutation (default on). |
+| Transfer Shipping Costs | No | Copy shipping costs (packaging, transport, customs, insurance). |
+| Keep Group Sorting | No | Order the positions by offer group first. |
+| Allow Repeated Transfer | No | Allow transferring positions that are already part of an order. Off = HTTP 409 instead of a duplicate order. |
+| Rounding | No | **Commercial (Like TaxMetall)** (default): half away from zero, identical to TaxMetall. **Mathematical (Half to Even)**: banker's rounding, can differ from TaxMetall by one cent. |
+| Order Number (additional field) | No | Explicit number for the new order. Default: next number from the TaxMetall number range. |
+| Rounding Factor (additional field) | No | Rounding of position prices, like the TaxMetall workstation setting `RF`. `100` = two decimals (default). |
+| Create Post-Calculation (additional field) | No | Create a post-calculation for every position, like the TaxMetall workstation setting `AutoNachKalk`. Off by default. |
+
+*Optional by default. If the TaxMetall system setting that enforces a customer order number (`PruefextBestnr`) is switched on, TaxMetall's own transfer dialog cannot be completed without it, and the node behaves the same way: the request is rejected with HTTP 400 and no order is created.
+
+The response contains `auftragNr`, the transferred `positionen` (offer position → order position,
+quantity, prices), the order `summen` and a list of `warnings`, for example when background
+reservation is active in TaxMetall. Reservation is not performed by the service and has to be
+checked in TaxMetall. The transfer runs in a single transaction: on any error nothing is written.
 
 #### Get Order Status
 
@@ -983,6 +1055,9 @@ version listed below covers everything in this package.
 | Purchase Invoice — Create | `/api/create-purchase-invoice` | 1.25.0 |
 | Customer Inquiry — all operations | `/api/get-customer-inquiries`, `/api/create-customer-inquiry` | 1.25.0 |
 | Workflow — all operations | `/api/get-workflows`, `/api/execute-workflow` | 1.25.0 |
+| Order — Create From Offer | `/api/create-order-from-offer` | 1.27.0 |
+| Offer — Create with Multiple Positions or From JSON | `/api/create-offer` (`positionen[]`) | 1.27.0 |
+| Positions Input *From JSON* with English or mixed-case keys (all create operations) | all create endpoints | 1.27.0 |
 
 ### Finding your service version
 

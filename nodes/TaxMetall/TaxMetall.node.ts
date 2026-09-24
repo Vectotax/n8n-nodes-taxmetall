@@ -111,6 +111,38 @@ function getTlsCertificateHint(error: unknown): string | undefined {
 		: undefined;
 }
 
+/**
+ * Reads the positions of a create operation from a JSON parameter when the position input
+ * mode is "json". Returns undefined for any other mode, so the caller keeps its row input.
+ * Accepts a list or an object that holds the list under positionen, positions, items or lines.
+ * Key names are passed through; the service maps common alternatives such as quantity or price.
+ */
+function readJsonPositions(
+	ctx: IExecuteFunctions,
+	modeParam: string,
+	jsonParam: string,
+	itemIndex: number,
+): unknown[] | undefined {
+	if ((ctx.getNodeParameter(modeParam, itemIndex, 'list') as string) !== 'json') return undefined;
+	const raw = ctx.getNodeParameter(jsonParam, itemIndex, '[]') as unknown;
+	let parsed: unknown = raw;
+	if (typeof raw === 'string') {
+		try {
+			parsed = JSON.parse(raw);
+		} catch {
+			throw new NodeOperationError(ctx.getNode(), 'Positions (JSON) is not valid JSON.', { itemIndex });
+		}
+	}
+	if (parsed && !Array.isArray(parsed) && typeof parsed === 'object') {
+		const wrapped = parsed as Record<string, unknown>;
+		parsed = wrapped.positionen ?? wrapped.positions ?? wrapped.items ?? wrapped.lines;
+	}
+	if (!Array.isArray(parsed) || parsed.length === 0) {
+		throw new NodeOperationError(ctx.getNode(), 'Positions (JSON) must be a non-empty list.', { itemIndex });
+	}
+	return parsed;
+}
+
 export class TaxMetall implements INodeType {
 	description: INodeTypeDescription = {
 		displayName: 'TaxMetall ERP',
@@ -228,6 +260,7 @@ export class TaxMetall implements INodeType {
 				displayOptions: { show: { resource: ['auftrag'] } },
 				options: [
 					{ name: 'Create', value: 'create', action: 'Create an order' },
+					{ name: 'Create From Offer', value: 'createFromOffer', action: 'Create an order from an offer' },
 					{ name: 'Get Order Status', value: 'getStatus', action: 'Get order status in order' },
 					{ name: 'Search by Date Range', value: 'getByDateRange', action: 'Search by date range in order' },
 				],
@@ -547,13 +580,41 @@ export class TaxMetall implements INodeType {
 				description: 'Customer number (customerid) the order is created for',
 			},
 			{
+				displayName: 'Positions Input',
+				name: 'auftragPositionInput',
+				type: 'options',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['create'] } },
+				options: [
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Manual List',
+						value: 'list',
+						description: 'Enter the positions one by one below',
+					},
+				],
+				default: 'list',
+				description: 'How the positions are entered',
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'auftragPositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['create'], auftragPositionInput: ['json'] } },
+				default: '[\n  {\n    "artikelnr": "A-100045"\n  },\n  {\n    "articleid": 1234,\n    "menge": 2,\n    "preis": 12.5,\n    "rabatt": 3\n  }\n]',
+				description: 'List of positions. Required per position: artikelnr or articleid. Optional: menge (default 1), preis (unit price, replaces the price determined by TaxMetall) and rabatt (discount in percent, replaces the determined discount). Without preis and rabatt TaxMetall determines both. The example shows a minimal position and one with all possible keys. An object holding the list under "positionen" works as well. Common English key names such as quantity or price are accepted too.',
+			},
+			{
 				displayName: 'Positions',
 				name: 'auftragPositionen',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add position',
 				default: {},
-				displayOptions: { show: { resource: ['auftrag'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['auftrag'], operation: ['create'], auftragPositionInput: ['list'] } },
 				description: 'One or more order positions (articles with quantity)',
 				options: [
 					{
@@ -573,6 +634,20 @@ export class TaxMetall implements INodeType {
 								type: 'string',
 								default: '',
 								description: 'Article number as text (artikelnr). Used when Article ID = 0.',
+							},
+							{
+								displayName: 'Discount %',
+								name: 'rabatt',
+								type: 'number',
+								default: 0,
+								description: 'Optional discount in percent. 0 = discount determined by TaxMetall. Use JSON input to force an explicit 0.',
+							},
+							{
+								displayName: 'Price',
+								name: 'preis',
+								type: 'number',
+								default: 0,
+								description: 'Optional unit price that replaces the price determined by TaxMetall. 0 = determined by TaxMetall.',
 							},
 							{
 								displayName: 'Quantity',
@@ -598,6 +673,230 @@ export class TaxMetall implements INodeType {
 						type: 'boolean',
 						default: false,
 						description: 'Whether to freeze the bill of materials and create the calculation (work plan / material) for each position. Off by default.',
+					},
+					{
+						displayName: 'Rounding',
+						name: 'rundungsart',
+						type: 'options',
+						options: [
+							{ name: 'Commercial (Like TaxMetall)', value: 'kaufmaennisch' },
+							{ name: 'Mathematical (Half to Even)', value: 'mathematisch' },
+						],
+						default: 'kaufmaennisch',
+						description: "How amounts are rounded. Commercial rounds x.xx5 up like TaxMetall; mathematical is banker's rounding and can differ by one cent.",
+					},
+					{
+						displayName: 'Rounding Factor',
+						name: 'rundungsfaktor',
+						type: 'number',
+						default: 100,
+						description: 'Rounding factor for position prices, like the TaxMetall workstation setting "RF". 100 = two decimals.',
+					},
+				],
+			},
+			// ─── PARAMETERS: Order -> create from offer ──────────────────────────────
+			{
+				displayName: 'Offer Number',
+				name: 'offerToOrderAngebotNr',
+				type: 'string',
+				required: true,
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: '',
+				description: 'Number of the existing offer (Angebotnr) that is transferred into a new order',
+			},
+			{
+				displayName: 'Position Selection',
+				name: 'offerToOrderPositionAuswahl',
+				type: 'options',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				options: [
+					{
+						name: 'Accepted in Offer',
+						value: 'accepted',
+						description: 'Transfer the positions whose "accept" checkbox (Akzeptieren) is set in the offer, like TaxMetall does',
+					},
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Manual List',
+						value: 'list',
+						description: 'Enter the positions one by one below',
+					},
+				],
+				default: 'list',
+				description: 'Which offer positions are transferred into the order',
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'offerToOrderPositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'], offerToOrderPositionAuswahl: ['json'] } },
+				default: '[\n  {\n    "positionsnr": 1\n  },\n  {\n    "positionsnr": 2,\n    "gruppennr": 1,\n    "menge": 10\n  }\n]',
+				description: 'List of offer positions. Required per position: positionsnr (also position, pos). Optional: gruppennr (group, only needed if the number exists in several offer groups) and menge (quantity, qty; default: quantity from the offer). A plain list of position numbers such as [1, 2, 3] works too, as does an object holding the list under "positionen", "positions" or "items". The example shows a minimal position and one with all possible keys.',
+			},
+			{
+				displayName: 'Positions',
+				name: 'offerToOrderPositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'], offerToOrderPositionAuswahl: ['list'] } },
+				description: 'Offer positions to transfer',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+								displayName: 'Group Number',
+								name: 'gruppennr',
+								type: 'number',
+								default: 0,
+								description: 'Offer group (GruppenNr). Only needed if the position number exists in several groups. 0 = any group.',
+							},
+							{
+								displayName: 'Position Number',
+								name: 'positionsnr',
+								type: 'number',
+								default: 1,
+								description: 'Position number in the offer (PositionsNr)',
+							},
+							{
+								displayName: 'Quantity',
+								name: 'menge',
+								type: 'number',
+								default: 0,
+								description: 'Quantity for the order position. 0 = take the quantity from the offer. A different quantity recalculates the position like a quantity change in the TaxMetall order.',
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Customer Order Number',
+				name: 'offerToOrderKundeBestellNr',
+				type: 'string',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: '',
+				description: "The customer's own purchase order number (Bestell-Nummer), e.g. PO-4711. It is stored in the order. Optional, unless the TaxMetall system setting that enforces a customer order number (PruefextBestnr) is on: then the transfer is rejected without it.",
+			},
+			{
+				displayName: 'Customer Order Date',
+				name: 'offerToOrderKundeBestellDatum',
+				type: 'string',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: '',
+				placeholder: '2026-01-31',
+				description: 'Order date of the customer (Bestell-Datum) in format yyyy-mm-dd. Empty = today.',
+			},
+			{
+				displayName: 'Transfer Intro Text',
+				name: 'offerToOrderVorlauftext',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: false,
+				description: 'Whether to copy the intro text (Vorlauftext) of the offer. If off, the default intro text for orders is used.',
+			},
+			{
+				displayName: 'Transfer Closing Text',
+				name: 'offerToOrderNachlauftext',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: false,
+				description: 'Whether to copy the closing text (Nachlauftext) of the offer. If off, the default closing text for orders is used.',
+			},
+			{
+				displayName: 'Transfer Personnel Number',
+				name: 'offerToOrderPersonalNr',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: true,
+				description: 'Whether to keep the employee of the offer. If off, the service employee from the service configuration is entered.',
+			},
+			{
+				displayName: 'Transfer Attention Of',
+				name: 'offerToOrderZuHaenden',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: true,
+				description: 'Whether to copy the contact person (Zu Haenden), partner number and salutation',
+			},
+			{
+				displayName: 'Transfer Shipping Costs',
+				name: 'offerToOrderVersandkosten',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: false,
+				description: 'Whether to copy the shipping costs (packaging, transport, customs, insurance)',
+			},
+			{
+				displayName: 'Keep Group Sorting',
+				name: 'offerToOrderGruppensortierung',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: false,
+				description: 'Whether to order the positions by offer group first (Gruppensortierung beibehalten)',
+			},
+			{
+				displayName: 'Allow Repeated Transfer',
+				name: 'offerToOrderErneuteUebergabe',
+				type: 'boolean',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				default: false,
+				description: 'Whether positions that were already transferred into an order may be transferred again. If off, the request fails with HTTP 409 instead of creating a duplicate order.',
+			},
+			{
+				displayName: 'Rounding',
+				name: 'offerToOrderRundungsart',
+				type: 'options',
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				options: [
+					{
+						name: 'Commercial (Like TaxMetall)',
+						value: 'kaufmaennisch',
+						description: 'Half away from zero (x.xx5 is rounded up). Identical to TaxMetall.',
+					},
+					{
+						name: 'Mathematical (Half to Even)',
+						value: 'mathematisch',
+						description: "Banker's rounding (x.xx5 is rounded to the even digit). Can differ from TaxMetall by one cent.",
+					},
+				],
+				default: 'kaufmaennisch',
+				description: 'How amounts (prices, totals, VAT) are rounded during the transfer',
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'offerToOrderAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['auftrag'], operation: ['createFromOffer'] } },
+				options: [
+					{
+						displayName: 'Create Post-Calculation',
+						name: 'nachkalkulationAnlegen',
+						type: 'boolean',
+						default: false,
+						description: 'Whether to create a post-calculation (Nachkalkulation) for every transferred position, like the TaxMetall workstation setting "AutoNachKalk"',
+					},
+					{
+						displayName: 'Order Number',
+						name: 'auftragnr',
+						type: 'number',
+						default: 0,
+						description: 'Explicit number for the new order. Empty or 0 = next number from the TaxMetall number range.',
+					},
+					{
+						displayName: 'Rounding Factor',
+						name: 'rundungsfaktor',
+						type: 'number',
+						default: 100,
+						description: 'Rounding factor for position prices, like the TaxMetall workstation setting "RF". 100 = two decimals, 1000 = three decimals.',
 					},
 				],
 			},
@@ -749,13 +1048,41 @@ export class TaxMetall implements INodeType {
 				placeholder: '2024-01-01',
 			},
 			{
+				displayName: 'Positions Input',
+				name: 'erCreatePositionInput',
+				type: 'options',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'] } },
+				options: [
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Manual List',
+						value: 'list',
+						description: 'Enter the positions one by one below',
+					},
+				],
+				default: 'list',
+				description: 'How the positions are entered',
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'erCreatePositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'], erCreatePositionInput: ['json'] } },
+				default: '[\n  {\n    "bezeichnung": "Material",\n    "menge": 10,\n    "preis": 4.2\n  },\n  {\n    "artikelnr": "A-100045",\n    "bezeichnung": "Steel sheet",\n    "menge": 5,\n    "preis": 12.5,\n    "preis_pro": 1,\n    "rabatt": 3,\n    "gesamt_netto": 60.63,\n    "mwst_satz": 19,\n    "mwst_schluessel": 1,\n    "konto": "3400",\n    "kostenstellennr": 100,\n    "bestellnr": 4711,\n    "bestellpos": 1,\n    "leistungsdatum": "2026-09-24",\n    "projektnr": "P-100",\n    "projektname": "Project"\n  }\n]',
+				description: 'List of positions. Required per position: artikelnr or bezeichnung, plus menge and preis (or gesamt_netto). Optional: preis_pro, rabatt, gesamt_netto, mwst_satz, mwst_schluessel, konto, kostenstellennr, bestellnr, bestellpos (link to a purchase order position), leistungsdatum (yyyy-mm-dd), projektnr, projektname. The example shows a minimal position and one with all possible keys. An object holding the list under "positionen" works as well. Common English key names such as quantity or price are accepted too.',
+			},
+			{
 				displayName: 'Positions',
 				name: 'erCreatePositionen',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add position',
 				default: {},
-				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'] } },
+				displayOptions: { show: { resource: ['eingangsrechnung'], operation: ['create'], erCreateModus: ['parameter'], erCreatePositionInput: ['list'] } },
 				description: 'One or more invoice positions. At least one is required.',
 				options: [
 					{
@@ -1075,13 +1402,41 @@ export class TaxMetall implements INodeType {
 				description: 'Supplier number (liefernr) the inquiry is created for',
 			},
 			{
+				displayName: 'Positions Input',
+				name: 'anfragePositionInput',
+				type: 'options',
+				displayOptions: { show: { resource: ['anfrage'], operation: ['create'] } },
+				options: [
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Manual List',
+						value: 'list',
+						description: 'Enter the positions one by one below',
+					},
+				],
+				default: 'list',
+				description: 'How the positions are entered',
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'anfragePositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['anfrage'], operation: ['create'], anfragePositionInput: ['json'] } },
+				default: '[\n  {\n    "artikelnr": "A-100045"\n  },\n  {\n    "articleid": 1234,\n    "menge": 5,\n    "preis": 12.5,\n    "rabatt": 3,\n    "preispro": 1\n  }\n]',
+				description: 'List of positions. Required per position: artikelnr or articleid. Optional: menge (default 1), preis, rabatt (percent), preispro (price per unit count, default 1). The example shows a minimal position and one with all possible keys. An object holding the list under "positionen" works as well. Common English key names such as quantity or price are accepted too.',
+			},
+			{
 				displayName: 'Positions',
 				name: 'anfragePositionen',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add position',
 				default: {},
-				displayOptions: { show: { resource: ['anfrage'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['anfrage'], operation: ['create'], anfragePositionInput: ['list'] } },
 				description: 'One or more inquiry positions (articles with quantity)',
 				options: [
 					{
@@ -1285,13 +1640,41 @@ export class TaxMetall implements INodeType {
 				description: 'Whether the customer number refers to the customer master or the acquisition master',
 			},
 			{
+				displayName: 'Positions Input',
+				name: 'kundenanfragePositionInput',
+				type: 'options',
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				options: [
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Manual List',
+						value: 'list',
+						description: 'Enter the positions one by one below',
+					},
+				],
+				default: 'list',
+				description: 'How the positions are entered',
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'kundenanfragePositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'], kundenanfragePositionInput: ['json'] } },
+				default: '[\n  {\n    "artikelnr": "A-100045"\n  },\n  {\n    "bezeichnung": "Special part",\n    "menge": 10,\n    "mengeneinheit": "Stk",\n    "zeichnungnr": "Z-4711",\n    "revisionsnr": "B",\n    "kundenartikelnr": "K-99",\n    "preis": 12.5,\n    "rabatt": 3,\n    "wert": 125,\n    "liefertermin": "2026-12-31",\n    "lieferzeittext": "4 weeks",\n    "projektnr": "P-100",\n    "infotext": "Note"\n  }\n]',
+				description: 'List of positions. Required per position: artikelnr, articleid or bezeichnung (free-text position). Optional: menge (default 1), mengeneinheit, zeichnungnr, revisionsnr, kundenartikelnr, preis, rabatt, wert, liefertermin (yyyy-mm-dd), lieferzeittext, projektnr, infotext. The example shows a minimal position and one with all possible keys. An object holding the list under "positionen" works as well. Common English key names such as quantity or price are accepted too.',
+			},
+			{
 				displayName: 'Positions',
 				name: 'kundenanfragePositionen',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add position',
 				default: {},
-				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['kundenanfrage'], operation: ['create'], kundenanfragePositionInput: ['list'] } },
 				description: 'One or more inquiry positions. A position without an article is allowed as long as it has a description.',
 				options: [
 					{
@@ -1612,13 +1995,41 @@ export class TaxMetall implements INodeType {
 				description: 'Supplier number (liefernr) the order is created for',
 			},
 			{
+				displayName: 'Positions Input',
+				name: 'bestellungPositionInput',
+				type: 'options',
+				displayOptions: { show: { resource: ['bestellung'], operation: ['create'] } },
+				options: [
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Manual List',
+						value: 'list',
+						description: 'Enter the positions one by one below',
+					},
+				],
+				default: 'list',
+				description: 'How the positions are entered',
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'bestellungPositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['bestellung'], operation: ['create'], bestellungPositionInput: ['json'] } },
+				default: '[\n  {\n    "artikelnr": "A-100045"\n  },\n  {\n    "articleid": 1234,\n    "menge": 5,\n    "preis": 12.5,\n    "rabatt": 3,\n    "preispro": 1\n  }\n]',
+				description: 'List of positions. Required per position: artikelnr or articleid. Optional: menge (default 1), preis, rabatt (percent), preispro (price per unit count, default 1). The example shows a minimal position and one with all possible keys. An object holding the list under "positionen" works as well. Common English key names such as quantity or price are accepted too.',
+			},
+			{
 				displayName: 'Positions',
 				name: 'bestellungPositionen',
 				type: 'fixedCollection',
 				typeOptions: { multipleValues: true, sortable: true },
 				placeholder: 'Add position',
 				default: {},
-				displayOptions: { show: { resource: ['bestellung'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['bestellung'], operation: ['create'], bestellungPositionInput: ['list'] } },
 				description: 'One or more order positions (articles with quantity)',
 				options: [
 					{
@@ -2002,10 +2413,95 @@ export class TaxMetall implements INodeType {
 				default: '',
 			},
 			{
+				displayName: 'Positions Input',
+				name: 'offerPositionInput',
+				type: 'options',
+				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				options: [
+					{
+						name: 'From JSON',
+						value: 'json',
+						description: 'Take the positions from a JSON list, e.g. from a previous node',
+					},
+					{
+						name: 'Multiple Positions',
+						value: 'list',
+						description: 'Enter several articles with their quantities below',
+					},
+					{
+						name: 'Single Article',
+						value: 'single',
+						description: 'One article with one quantity',
+					},
+				],
+				default: 'single',
+				description: 'How the offer positions are entered',
+			},
+			{
+				displayName: 'Positions',
+				name: 'offerPositionen',
+				type: 'fixedCollection',
+				typeOptions: { multipleValues: true, sortable: true },
+				placeholder: 'Add position',
+				default: {},
+				displayOptions: { show: { resource: ['offer'], operation: ['create'], offerPositionInput: ['list'] } },
+				description: 'One or more offer positions (articles with quantity)',
+				options: [
+					{
+						displayName: 'Position',
+						name: 'position',
+						values: [
+							{
+								displayName: 'Article ID',
+								name: 'articleid',
+								type: 'number',
+								default: 0,
+								description: 'Numeric article ID (articleid). Alternatively specify an article number below.',
+							},
+							{
+								displayName: 'Article Number',
+								name: 'artikelnr',
+								type: 'string',
+								default: '',
+								description: 'Article number as text (artikelnr). Used when Article ID = 0.',
+							},
+							{
+								displayName: 'Discount %',
+								name: 'rabatt',
+								type: 'number',
+								default: 0,
+								description: 'Optional discount in percent. 0 = discount determined by TaxMetall. Use JSON input to force an explicit 0.',
+							},
+							{
+								displayName: 'Price',
+								name: 'preis',
+								type: 'number',
+								default: 0,
+								description: 'Optional unit price that replaces the price determined by TaxMetall. 0 = determined by TaxMetall.',
+							},
+							{
+								displayName: 'Quantity',
+								name: 'menge',
+								type: 'number',
+								default: 1,
+							},
+						],
+					},
+				],
+			},
+			{
+				displayName: 'Positions (JSON)',
+				name: 'offerPositionenJson',
+				type: 'json',
+				displayOptions: { show: { resource: ['offer'], operation: ['create'], offerPositionInput: ['json'] } },
+				default: '[\n  {\n    "artikelnr": "A-100045"\n  },\n  {\n    "articleid": 1234,\n    "menge": 2,\n    "preis": 12.5,\n    "rabatt": 3\n  }\n]',
+				description: 'List of positions. Required per position: artikelnr or articleid. Optional: menge (default 1), preis (unit price, replaces the price determined by TaxMetall) and rabatt (discount in percent, replaces the determined discount). Without preis and rabatt TaxMetall determines both. The example shows a minimal position and one with all possible keys. An object holding the list under "positionen" works as well. Common English key names such as quantity or price are accepted too.',
+			},
+			{
 				displayName: 'Article ID',
 				name: 'offerArtId',
 				type: 'number',
-				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['offer'], operation: ['create'], offerPositionInput: ['single'] } },
 				default: 0,
 				description: 'Numeric article ID (articleid). Alternatively specify an article number in the field below.',
 			},
@@ -2013,7 +2509,7 @@ export class TaxMetall implements INodeType {
 				displayName: 'Article Number',
 				name: 'offerArtNr',
 				type: 'string',
-				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['offer'], operation: ['create'], offerPositionInput: ['single'] } },
 				default: '',
 				description: 'Article number as text (artikelnr). Used when Article ID = 0.',
 			},
@@ -2021,8 +2517,36 @@ export class TaxMetall implements INodeType {
 				displayName: 'Quantity',
 				name: 'amount',
 				type: 'number',
-				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				displayOptions: { show: { resource: ['offer'], operation: ['create'], offerPositionInput: ['single'] } },
 				default: 1,
+			},
+			{
+				displayName: 'Additional Fields',
+				name: 'offerCreateAdditionalFields',
+				type: 'collection',
+				placeholder: 'Add field',
+				default: {},
+				displayOptions: { show: { resource: ['offer'], operation: ['create'] } },
+				options: [
+					{
+						displayName: 'Rounding',
+						name: 'rundungsart',
+						type: 'options',
+						options: [
+							{ name: 'Commercial (Like TaxMetall)', value: 'kaufmaennisch' },
+							{ name: 'Mathematical (Half to Even)', value: 'mathematisch' },
+						],
+						default: 'kaufmaennisch',
+						description: "How amounts are rounded. Commercial rounds x.xx5 up like TaxMetall; mathematical is banker's rounding and can differ by one cent.",
+					},
+					{
+						displayName: 'Rounding Factor',
+						name: 'rundungsfaktor',
+						type: 'number',
+						default: 100,
+						description: 'Rounding factor for position prices, like the TaxMetall workstation setting "RF". 100 = two decimals.',
+					},
+				],
 			},
 			{
 				displayName: 'Offer Number',
@@ -2741,10 +3265,11 @@ export class TaxMetall implements INodeType {
 						}
 
 						const positionsInput = positionenRaw.position ?? [];
-						if (positionsInput.length === 0) {
+						const jsonPositionen = readJsonPositions(this, 'kundenanfragePositionInput', 'kundenanfragePositionenJson', i);
+						if (!jsonPositionen && positionsInput.length === 0) {
 							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
 						}
-						const positionen = positionsInput.map((pos, idx) => {
+						const positionen = jsonPositionen ?? positionsInput.map((pos, idx) => {
 							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
 							if (pos.articleid && pos.articleid !== 0) {
 								entry.articleid = pos.articleid;
@@ -2817,7 +3342,7 @@ export class TaxMetall implements INodeType {
 				} else if (resource === 'auftrag') {
 					if (operation === 'create') {
 						const positionenRaw = this.getNodeParameter('auftragPositionen', i, {}) as {
-							position?: Array<{ articleid?: number; artikelnr?: string; menge?: number }>;
+							position?: Array<{ articleid?: number; artikelnr?: string; menge?: number; preis?: number; rabatt?: number }>;
 						};
 						const additionalFields = this.getNodeParameter('auftragCreateAdditionalFields', i, {}) as Record<string, unknown>;
 
@@ -2827,10 +3352,11 @@ export class TaxMetall implements INodeType {
 						}
 
 						const positionsInput = positionenRaw.position ?? [];
-						if (positionsInput.length === 0) {
+						const jsonPositionen = readJsonPositions(this, 'auftragPositionInput', 'auftragPositionenJson', i);
+						if (!jsonPositionen && positionsInput.length === 0) {
 							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
 						}
-						const positionen = positionsInput.map((pos, idx) => {
+						const positionen = jsonPositionen ?? positionsInput.map((pos, idx) => {
 							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
 							if (pos.articleid && pos.articleid !== 0) {
 								entry.articleid = pos.articleid;
@@ -2843,6 +3369,9 @@ export class TaxMetall implements INodeType {
 									{ itemIndex: i },
 								);
 							}
+							// Zero keeps the automatic price and discount of TaxMetall
+							if (pos.preis) entry.preis = pos.preis;
+							if (pos.rabatt) entry.rabatt = pos.rabatt;
 							return entry;
 						});
 						const auftragBody: Record<string, unknown> = {
@@ -2850,10 +3379,86 @@ export class TaxMetall implements INodeType {
 							positionen,
 						};
 						if (additionalFields.kalkulation !== undefined) auftragBody.kalkulation = additionalFields.kalkulation;
+						if (additionalFields.rundungsart) auftragBody.rundungsart = additionalFields.rundungsart;
+						if (additionalFields.rundungsfaktor && Number(additionalFields.rundungsfaktor) > 0) auftragBody.rundungsfaktor = additionalFields.rundungsfaktor;
 						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'POST',
 							url: `${baseUrl}/api/create-order`,
 							body: auftragBody,
+							headers,
+							json: true,
+							...tlsOption,
+						});
+					} else if (operation === 'createFromOffer') {
+						const angebotNr = (this.getNodeParameter('offerToOrderAngebotNr', i) as string).trim();
+						if (!angebotNr) {
+							throw new NodeOperationError(this.getNode(), 'Offer Number is required.', { itemIndex: i });
+						}
+						const positionAuswahl = this.getNodeParameter('offerToOrderPositionAuswahl', i, 'list') as string;
+						// Undefined = key omitted, the service then uses the accepted positions of the offer
+						let positionen: unknown;
+						if (positionAuswahl === 'list') {
+							const positionenRaw = this.getNodeParameter('offerToOrderPositionen', i, {}) as {
+								position?: Array<{ positionsnr?: number; gruppennr?: number; menge?: number }>;
+							};
+							// Zero means "not set" for group and quantity, the service then applies the offer values
+							const list = (positionenRaw.position ?? []).map((pos) => {
+								const entry: Record<string, unknown> = { positionsnr: pos.positionsnr ?? 0 };
+								if (pos.gruppennr && pos.gruppennr > 0) entry.gruppennr = pos.gruppennr;
+								if (pos.menge && pos.menge > 0) entry.menge = pos.menge;
+								return entry;
+							});
+							if (list.length === 0) {
+								throw new NodeOperationError(
+									this.getNode(),
+									'Add at least one position, or choose "Accepted in Offer" as position selection.',
+									{ itemIndex: i },
+								);
+							}
+							positionen = list;
+						} else if (positionAuswahl === 'json') {
+							const rawJson = this.getNodeParameter('offerToOrderPositionenJson', i, '[]') as unknown;
+							if (typeof rawJson === 'string') {
+								try {
+									positionen = JSON.parse(rawJson);
+								} catch {
+									throw new NodeOperationError(this.getNode(), 'Positions (JSON) is not valid JSON.', { itemIndex: i });
+								}
+							} else {
+								positionen = rawJson;
+							}
+							// The service validates the entries and maps the alternative key names
+							if (Array.isArray(positionen) && positionen.length === 0) {
+								throw new NodeOperationError(
+									this.getNode(),
+									'Positions (JSON) is empty. Choose "Accepted in Offer" to transfer the accepted positions.',
+									{ itemIndex: i },
+								);
+							}
+						}
+						const additionalFields = this.getNodeParameter('offerToOrderAdditionalFields', i, {}) as Record<string, unknown>;
+						const offerBody: Record<string, unknown> = {
+							angebotnr: angebotNr,
+							kundeBestellNr: this.getNodeParameter('offerToOrderKundeBestellNr', i, '') as string,
+							vorlauftextUebernehmen: this.getNodeParameter('offerToOrderVorlauftext', i, false) as boolean,
+							nachlauftextUebernehmen: this.getNodeParameter('offerToOrderNachlauftext', i, false) as boolean,
+							personalNrUebernehmen: this.getNodeParameter('offerToOrderPersonalNr', i, true) as boolean,
+							zuHaendenUebernehmen: this.getNodeParameter('offerToOrderZuHaenden', i, true) as boolean,
+							versandkostenUebernehmen: this.getNodeParameter('offerToOrderVersandkosten', i, false) as boolean,
+							gruppensortierungBeibehalten: this.getNodeParameter('offerToOrderGruppensortierung', i, false) as boolean,
+							erneuteUebergabeErlauben: this.getNodeParameter('offerToOrderErneuteUebergabe', i, false) as boolean,
+							rundungsart: this.getNodeParameter('offerToOrderRundungsart', i, 'kaufmaennisch') as string,
+						};
+						if (positionen !== undefined) offerBody.positionen = positionen;
+						const bestellDatum = (this.getNodeParameter('offerToOrderKundeBestellDatum', i, '') as string).trim();
+						if (bestellDatum) offerBody.kundeBestellDatum = bestellDatum;
+						if (additionalFields.auftragnr && Number(additionalFields.auftragnr) > 0) offerBody.auftragnr = additionalFields.auftragnr;
+						if (additionalFields.rundungsfaktor && Number(additionalFields.rundungsfaktor) > 0) offerBody.rundungsfaktor = additionalFields.rundungsfaktor;
+						if (additionalFields.nachkalkulationAnlegen !== undefined) offerBody.nachkalkulationAnlegen = additionalFields.nachkalkulationAnlegen;
+						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
+							method: 'POST',
+							url: `${baseUrl}/api/create-order-from-offer`,
+							body: offerBody,
 							headers,
 							json: true,
 							...tlsOption,
@@ -2915,10 +3520,11 @@ export class TaxMetall implements INodeType {
 							}>;
 						};
 						const positionsInput = positionenRaw.position ?? [];
-						if (positionsInput.length === 0) {
+						const jsonPositionen = readJsonPositions(this, 'erCreatePositionInput', 'erCreatePositionenJson', i);
+						if (!jsonPositionen && positionsInput.length === 0) {
 							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
 						}
-						erBody.positionen = positionsInput.map((pos, idx) => {
+						erBody.positionen = jsonPositionen ?? positionsInput.map((pos, idx) => {
 							if (!pos.artikelnr && !pos.bezeichnung) {
 								throw new NodeOperationError(
 									this.getNode(),
@@ -3015,10 +3621,11 @@ export class TaxMetall implements INodeType {
 						}
 
 						const positionsInput = positionenRaw.position ?? [];
-						if (positionsInput.length === 0) {
+						const jsonPositionen = readJsonPositions(this, 'anfragePositionInput', 'anfragePositionenJson', i);
+						if (!jsonPositionen && positionsInput.length === 0) {
 							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
 						}
-						const positionen = positionsInput.map((pos, idx) => {
+						const positionen = jsonPositionen ?? positionsInput.map((pos, idx) => {
 							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
 							if (pos.articleid && pos.articleid !== 0) {
 								entry.articleid = pos.articleid;
@@ -3081,10 +3688,11 @@ export class TaxMetall implements INodeType {
 						}
 
 						const positionsInput = positionenRaw.position ?? [];
-						if (positionsInput.length === 0) {
+						const jsonPositionen = readJsonPositions(this, 'bestellungPositionInput', 'bestellungPositionenJson', i);
+						if (!jsonPositionen && positionsInput.length === 0) {
 							throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
 						}
-						const positionen = positionsInput.map((pos, idx) => {
+						const positionen = jsonPositionen ?? positionsInput.map((pos, idx) => {
 							const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
 							if (pos.articleid && pos.articleid !== 0) {
 								entry.articleid = pos.articleid;
@@ -3295,17 +3903,68 @@ export class TaxMetall implements INodeType {
 				// ── Offer ──────────────────────────────────────────────────────────────
 				} else if (resource === 'offer') {
 					if (operation === 'create') {
-						const offerArtId = this.getNodeParameter('offerArtId', i) as number;
-						const offerArtNr = this.getNodeParameter('offerArtNr', i) as string;
 						const offerBody: Record<string, unknown> = {
 							customerid: this.getNodeParameter('offerCustId', i),
-							menge: this.getNodeParameter('amount', i),
 						};
-						if (offerArtId && offerArtId !== 0) {
-							offerBody.articleid = offerArtId;
-						} else if (offerArtNr) {
-							offerBody.artikelnr = offerArtNr;
+						// Older workflows have no value here and keep the single-article behavior
+						const positionInput = this.getNodeParameter('offerPositionInput', i, 'single') as string;
+						if (positionInput === 'list') {
+							const positionenRaw = this.getNodeParameter('offerPositionen', i, {}) as {
+								position?: Array<{ articleid?: number; artikelnr?: string; menge?: number; preis?: number; rabatt?: number }>;
+							};
+							const positionsInput = positionenRaw.position ?? [];
+							if (positionsInput.length === 0) {
+								throw new NodeOperationError(this.getNode(), 'At least one position is required.', { itemIndex: i });
+							}
+							offerBody.positionen = positionsInput.map((pos, idx) => {
+								const entry: Record<string, unknown> = { menge: pos.menge ?? 1 };
+								if (pos.articleid && pos.articleid !== 0) {
+									entry.articleid = pos.articleid;
+								} else if (pos.artikelnr) {
+									entry.artikelnr = pos.artikelnr;
+								} else {
+									throw new NodeOperationError(
+										this.getNode(),
+										`Position ${idx + 1}: an Article ID or Article Number is required.`,
+										{ itemIndex: i },
+									);
+								}
+								// Zero keeps the automatic price and discount of TaxMetall
+								if (pos.preis) entry.preis = pos.preis;
+								if (pos.rabatt) entry.rabatt = pos.rabatt;
+								return entry;
+							});
+						} else if (positionInput === 'json') {
+							const rawJson = this.getNodeParameter('offerPositionenJson', i, '[]') as unknown;
+							let parsed: unknown = rawJson;
+							if (typeof rawJson === 'string') {
+								try {
+									parsed = JSON.parse(rawJson);
+								} catch {
+									throw new NodeOperationError(this.getNode(), 'Positions (JSON) is not valid JSON.', { itemIndex: i });
+								}
+							}
+							if (parsed && !Array.isArray(parsed) && typeof parsed === 'object') {
+								const wrapped = parsed as Record<string, unknown>;
+								parsed = wrapped.positionen ?? wrapped.positions ?? wrapped.items;
+							}
+							if (!Array.isArray(parsed) || parsed.length === 0) {
+								throw new NodeOperationError(this.getNode(), 'Positions (JSON) must be a non-empty list.', { itemIndex: i });
+							}
+							offerBody.positionen = parsed;
+						} else {
+							const offerArtId = this.getNodeParameter('offerArtId', i) as number;
+							const offerArtNr = this.getNodeParameter('offerArtNr', i) as string;
+							offerBody.menge = this.getNodeParameter('amount', i);
+							if (offerArtId && offerArtId !== 0) {
+								offerBody.articleid = offerArtId;
+							} else if (offerArtNr) {
+								offerBody.artikelnr = offerArtNr;
+							}
 						}
+						const offerAdditional = this.getNodeParameter('offerCreateAdditionalFields', i, {}) as Record<string, unknown>;
+						if (offerAdditional.rundungsart) offerBody.rundungsart = offerAdditional.rundungsart;
+						if (offerAdditional.rundungsfaktor && Number(offerAdditional.rundungsfaktor) > 0) offerBody.rundungsfaktor = offerAdditional.rundungsfaktor;
 						responseData = await this.helpers.httpRequestWithAuthentication.call(this, 'taxMetallApi', {
 							method: 'POST',
 							url: `${baseUrl}/api/create-offer`,
