@@ -3390,7 +3390,9 @@ export class TaxMetall implements INodeType {
 							...tlsOption,
 						});
 					} else if (operation === 'createFromOffer') {
-						const angebotNr = (this.getNodeParameter('offerToOrderAngebotNr', i) as string).trim();
+						// The field is declared as string, but n8n does not coerce the runtime value
+						// when it comes from an expression, so a numeric value would break .trim().
+						const angebotNr = String(this.getNodeParameter('offerToOrderAngebotNr', i)).trim();
 						if (!angebotNr) {
 							throw new NodeOperationError(this.getNode(), 'Offer Number is required.', { itemIndex: i });
 						}
@@ -3450,7 +3452,7 @@ export class TaxMetall implements INodeType {
 							rundungsart: this.getNodeParameter('offerToOrderRundungsart', i, 'kaufmaennisch') as string,
 						};
 						if (positionen !== undefined) offerBody.positionen = positionen;
-						const bestellDatum = (this.getNodeParameter('offerToOrderKundeBestellDatum', i, '') as string).trim();
+						const bestellDatum = String(this.getNodeParameter('offerToOrderKundeBestellDatum', i, '')).trim();
 						if (bestellDatum) offerBody.kundeBestellDatum = bestellDatum;
 						if (additionalFields.auftragnr && Number(additionalFields.auftragnr) > 0) offerBody.auftragnr = additionalFields.auftragnr;
 						if (additionalFields.rundungsfaktor && Number(additionalFields.rundungsfaktor) > 0) offerBody.rundungsfaktor = additionalFields.rundungsfaktor;
@@ -3489,21 +3491,21 @@ export class TaxMetall implements INodeType {
 					const erBody: Record<string, unknown> = {};
 
 					if (modus === 'erechnung') {
-						const xml = (this.getNodeParameter('erCreateXml', i) as string ?? '').trim();
+						const xml = String(this.getNodeParameter('erCreateXml', i) ?? '').trim();
 						if (!xml) {
 							throw new NodeOperationError(this.getNode(), 'Invoice XML is required in e-invoice mode.', { itemIndex: i });
 						}
 						erBody.modus = 'erechnung';
 						erBody.xml = xml;
 						erBody.rabatt_modus = this.getNodeParameter('erCreateRabattModus', i, 'positionen') as string;
-						const lieferNr = (this.getNodeParameter('erCreateLieferNrOptional', i, '') as string ?? '').trim();
+						const lieferNr = String(this.getNodeParameter('erCreateLieferNrOptional', i, '') ?? '').trim();
 						if (lieferNr) erBody.liefernr = lieferNr;
 					} else {
-						const lieferNr = (this.getNodeParameter('erCreateLieferNr', i) as string ?? '').trim();
+						const lieferNr = String(this.getNodeParameter('erCreateLieferNr', i) ?? '').trim();
 						if (!lieferNr) {
 							throw new NodeOperationError(this.getNode(), 'Supplier Number is required.', { itemIndex: i });
 						}
-						const erNr = (this.getNodeParameter('erCreateErNr', i) as string ?? '').trim();
+						const erNr = String(this.getNodeParameter('erCreateErNr', i) ?? '').trim();
 						if (!erNr) {
 							throw new NodeOperationError(this.getNode(), 'Purchase Invoice Number is required.', { itemIndex: i });
 						}
@@ -4438,7 +4440,7 @@ export class TaxMetall implements INodeType {
 							suppressLoopGuard: this.getNodeParameter('createDokumentSuppressLoopGuard', i, false),
 						};
 						// sharePointUrl is optional now — only send it when provided.
-						const createSharePointUrl = (this.getNodeParameter('createDokumentSharePointUrl', i, '') as string).trim();
+						const createSharePointUrl = String(this.getNodeParameter('createDokumentSharePointUrl', i, '')).trim();
 						if (createSharePointUrl) createBody.sharePointUrl = createSharePointUrl;
 						if (Object.keys(email).length > 0) createBody.email = email;
 						if (attachments.length > 0) createBody.attachments = attachments;
